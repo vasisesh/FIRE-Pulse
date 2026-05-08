@@ -26,6 +26,15 @@ TTWO,2.719393,213.76,Robinhood,Margin,,0
 UBER,42.189843,74.61,Robinhood,Margin,,0
 VGT,88.524888,103.18,Robinhood,Margin,,0
 VRT,7.719113,328.49,Robinhood,Margin,,0
+ANET,1.116857,172.71,Robinhood,Cash,,0
+AVGO,1.677061,417.43,Robinhood,Cash,,0
+CRDO,8.3776,174.01,Robinhood,Cash,,0
+HOOD,8,72.89,Robinhood,Cash,,0
+INOD,17.750223,42.23,Robinhood,Cash,,0
+LRCX,9.22168,257.86,Robinhood,Cash,,0
+MRVL,1.823521,165.15,Robinhood,Cash,,0
+MU,6.941185,134.4,Robinhood,Cash,,0
+VRT,4.195155,328.49,Robinhood,Cash,,0
 VTSAX,1080,172.4,ETRADE,Cash,,0
 VWUSX,82.772,74.06,ETRADE,Cash,,0
 VFIAX,15.115,665.67,ETRADE,Cash,,0
@@ -38,4 +47,4 @@ VTI,222.203,362.28,College Fund,Cash,,0
 WFSPX,157.092,857.255,Retirement,Roth 401k,4/24/26,33500
 JLGMX,641.5629,89.96,Retirement,Roth 401k,4/24/26,33500
 CASH,40000,1,HYSA,Cash,,0
-INDIA_ASSETS,1,300000,Non-US Assets,Manual,,0
+INDIA_ASSETS,300000,1,India Assets,Manual,,0
