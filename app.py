@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import yfinance as yf
-from datetime import datetime
 
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="FIRE Pulse | Robinhood Core", layout="wide", page_icon="🔥")
@@ -18,18 +17,16 @@ st.markdown("""
 # --- 2. DATA ENGINE ---
 @st.cache_data(ttl=300)
 def load_robinhood_data():
-    # Load and clean headers
     df = pd.read_csv("portfolio.csv", on_bad_lines='skip')
     df.columns = [c.strip() for c in df.columns]
     
-    # STAGE 1: Strict Filtering for Robinhood only
+    # Strict Robinhood Filter
     df = df[df['Category'].fillna('').str.contains('Robinhood', case=False)].copy()
     
-    # STAGE 2: Force numeric types for calculations
     df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce').fillna(0)
     df['Purchase Price'] = pd.to_numeric(df['Purchase Price'], errors='coerce').fillna(0)
 
-    # STAGE 3: Live Price Sync
+    # Price Sync
     tickers = [t for t in df['Ticker'].unique() if str(t).upper() not in ['CASH', 'NAN']]
     live_prices = {}
     if tickers:
@@ -39,46 +36,36 @@ def load_robinhood_data():
                 live_prices = sync['Close'].iloc[-1].to_dict()
         except: pass
 
-    # STAGE 4: Valuation
-    def calc_val(row):
-        t = str(row['Ticker']).strip().upper()
-        p = live_prices.get(t, row['Purchase Price'])
-        return row['Quantity'] * p
-
-    df['Current Value'] = df.apply(calc_val, axis=1)
+    df['Current Value'] = df.apply(lambda r: r['Quantity'] * live_prices.get(str(r['Ticker']).upper(), r['Purchase Price']), axis=1)
     return df
 
-# --- 3. DASHBOARD UI ---
+# --- 3. UI ---
 try:
     df = load_robinhood_data()
-    total_val = df['Current Value'].sum()
-
-    st.title("🔥 FIRE Pulse: Robinhood Core")
     
-    # TOP SUMMARY
-    st.metric("📦 TOTAL ROBINHOOD ASSETS", fmt(total_val))
+    st.title("🔥 FIRE Pulse: Robinhood Core")
+    st.metric("📦 TOTAL ROBINHOOD ASSETS", fmt(df['Current Value'].sum()))
     st.divider()
 
-    # TWO-COLUMN DATA VIEW
-    left_col, right_col = st.columns([3, 2])
+    left, right = st.columns([3, 2])
 
-    with left_col:
+    with left:
         st.write("### 🏗️ All Robinhood Holdings")
-        disp_all = df[df['Current Value'] > 0][['Ticker', 'Account Type', 'Current Value']]
+        # Aggregating by Ticker and Account Type for total clarity
+        disp = df[df['Current Value'] > 0][['Ticker', 'Account Type', 'Current Value']]
         st.dataframe(
-            disp_all.sort_values('Current Value', ascending=False).style.format({'Current Value': fmt}),
-            use_container_width=True,
-            hide_index=True
+            disp.sort_values('Current Value', ascending=False).style.format({'Current Value': fmt}),
+            use_container_width=True, hide_index=True
         )
 
-    with right_col:
+    with right:
         st.write("### 🏆 Top 10 Positions")
-        top_10 = df.nlargest(10, 'Current Value')[['Ticker', 'Current Value']]
+        # Grouping in case you have the same ticker in both Cash and Margin
+        top_10 = df.groupby('Ticker')['Current Value'].sum().nlargest(10).reset_index()
         st.dataframe(
             top_10.style.format({'Current Value': fmt}),
-            use_container_width=True,
-            hide_index=True
+            use_container_width=True, hide_index=True
         )
 
 except Exception as e:
-    st.error(f"Waiting for Data Connection... (System Note: {e})")
+    st.error(f"Syncing... ({e})")
