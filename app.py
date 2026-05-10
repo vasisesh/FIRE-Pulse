@@ -17,26 +17,24 @@ st.markdown("""
 # --- 2. DATA ENGINE ---
 @st.cache_data(ttl=300)
 def load_robinhood_data():
+    # Load raw data
     df = pd.read_csv("portfolio.csv", on_bad_lines='skip')
     
-    # Clean column headers
-    df.columns = [c.strip() for c in df.columns]
+    # Standardize column names by removing spaces and forcing lowercase for matching
+    df.columns = [c.strip().lower() for c in df.columns]
     
-    # Precision cleaning: Only strip whitespace from text columns
-    text_cols = ['Ticker', 'Category', 'Account Type']
-    for col in text_cols:
-        if col in df.columns:
-            df[col] = df[col].astype(str).str.strip()
+    # Filter for Robinhood rows before doing anything else
+    # We use 'category' because we forced the header to lowercase
+    df = df[df['category'].fillna('').str.contains('Robinhood', case=False)].copy()
     
-    # Strict Robinhood Filter
-    df = df[df['Category'].str.contains('Robinhood', case=False, na=False)].copy()
-    
-    # Force numeric conversion for value columns
-    df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce').fillna(0)
-    df['Purchase Price'] = pd.to_numeric(df['Purchase Price'], errors='coerce').fillna(0)
+    # Force the core columns to be clean and correctly typed
+    df['ticker'] = df['ticker'].astype(str).str.strip().str.upper()
+    df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce').fillna(0)
+    df['purchase price'] = pd.to_numeric(df['purchase price'], errors='coerce').fillna(0)
+    df['account type'] = df['account type'].fillna('Unknown').astype(str).str.strip()
 
     # Price Sync
-    tickers = [t for t in df['Ticker'].unique() if str(t).upper() not in ['CASH', 'NAN']]
+    tickers = [t for t in df['ticker'].unique() if t not in ['CASH', 'NAN']]
     live_prices = {}
     if tickers:
         try:
@@ -45,7 +43,8 @@ def load_robinhood_data():
                 live_prices = sync['Close'].iloc[-1].to_dict()
         except: pass
 
-    df['Current Value'] = df.apply(lambda r: r['Quantity'] * live_prices.get(str(r['Ticker']).upper(), r['Purchase Price']), axis=1)
+    # Valuation Logic
+    df['Current Value'] = df.apply(lambda r: r['quantity'] * live_prices.get(r['ticker'], r['purchase price']), axis=1)
     return df
 
 # --- 3. UI ---
@@ -53,16 +52,19 @@ try:
     df = load_robinhood_data()
     
     st.title("🔥 FIRE Pulse: Robinhood Core")
-    st.metric("📦 TOTAL ROBINHOOD ASSETS", fmt(df['Current Value'].sum()))
+    total_rh = df['Current Value'].sum()
+    st.metric("📦 TOTAL ROBINHOOD ASSETS", fmt(total_rh))
     st.divider()
 
     left, right = st.columns([3, 2])
 
     with left:
         st.write(f"### 🏗️ All Robinhood Holdings ({len(df)} positions)")
-        disp = df[df['Current Value'] > 0][['Ticker', 'Account Type', 'Current Value']]
+        # We use the lowercase names to match our cleaned dataframe
+        disp = df[df['Current Value'] > 0][['ticker', 'account type', 'Current Value']]
+        # Rename columns back to 'Pretty' versions for the UI
+        disp.columns = ['Ticker', 'Type', 'Current Value']
         
-        # Using use_container_width and height=None for full visibility
         st.dataframe(
             disp.sort_values('Current Value', ascending=False).style.format({'Current Value': fmt}),
             use_container_width=True, 
@@ -72,11 +74,12 @@ try:
 
     with right:
         st.write("### 🏆 Top 10 Positions")
-        top_10 = df.groupby('Ticker')['Current Value'].sum().nlargest(10).reset_index()
+        top_10 = df.groupby('ticker')['Current Value'].sum().nlargest(10).reset_index()
+        top_10.columns = ['Ticker', 'Current Value']
         st.dataframe(
             top_10.style.format({'Current Value': fmt}),
             use_container_width=True, hide_index=True
         )
 
 except Exception as e:
-    st.error(f"Waiting for Data... (Technical Note: {e})")
+    st.error(f"Syncing Error: {e}. Please check your portfolio.csv headers.")
