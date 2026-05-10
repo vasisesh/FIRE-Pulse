@@ -108,4 +108,13 @@ st.divider()
 # Row 3: Table
 st.subheader("Holdings Detail")
 st.dataframe(df[['Name', 'Category', 'Quantity', 'Current_Value', 'Day_Change_Dollar']].sort_values('Current_Value', ascending=False).style.format({
-    'Current_Value': '${
+    'Current_Value': '${:,.0f}',
+    'Day_Change_Dollar': '${:,.2f}'
+}), use_container_width=True, hide_index=True)
+
+# Final insight
+if fire_progress >= 100:
+    st.balloons()
+    st.success("You've hit your FIRE Fund goal! 2030 is looking bright.")
+else:
+    st.info(f"💡 You are ${TARGET_FIRE_FUND - fire_fund_current:,.0f} away from your {TARGET_YEAR} milestone.")
