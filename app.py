@@ -2,14 +2,12 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 import plotly.express as px
-import plotly.graph_objects as go
-import numpy as np
 from datetime import datetime
 
 # --- APP CONFIG ---
 st.set_page_config(page_title="FIRE Pulse", layout="wide")
 
-# --- STYLING (High Contrast) ---
+# --- STYLING ---
 st.markdown("""
     <style>
     [data-testid="stMetric"] {
@@ -32,7 +30,6 @@ TARGET_YEAR = 2030
 
 # --- DATA ENGINE ---
 def load_and_pulse_data():
-    # Robinhood Holdings
     stocks = {
         'AAPL': 32.875151, 'AMD': 17.228305, 'AMZN': 6.139473, 'ANET': 6.970517, 
         'AVGO': 17.692543, 'CRWD': 6.730194, 'DELL': 7.15184, 'DIS': 14.709586, 
@@ -47,14 +44,9 @@ def load_and_pulse_data():
     }
     
     rows = []
-    # Add Stocks
     for ticker, qty in stocks.items():
         rows.append({'Name': ticker, 'Ticker': ticker, 'Quantity': qty, 'Category': 'Equity (RH)', 'Base_Value': 0})
-    
-    # Add Crypto
     rows.append({'Name': 'Bitcoin', 'Ticker': 'BTC-USD', 'Quantity': 0.06752957, 'Category': 'Crypto', 'Base_Value': 0})
-    
-    # Add Fixed Assets
     rows.append({'Name': 'International Holdings', 'Ticker': 'INTL_FLAT', 'Quantity': 1, 'Category': 'International', 'Base_Value': 300000})
     rows.append({'Name': 'Primary Residence', 'Ticker': 'HOME', 'Quantity': 1, 'Category': 'Real Estate', 'Base_Value': 600000})
     
@@ -62,31 +54,37 @@ def load_and_pulse_data():
     tickers_to_fetch = list(stocks.keys()) + ['BTC-USD']
     
     try:
-        stock_data = yf.download(tickers_to_fetch, period="2d", group_by='ticker', progress=False)
+        # Fetch 5 days to ensure we bridge the weekend
+        stock_data = yf.download(tickers_to_fetch, period="5d", group_by='ticker', progress=False)
         
-        def get_prices(ticker):
-            if ticker in ['INTL_FLAT', 'HOME']: 
-                val = df.loc[df['Ticker']==ticker, 'Base_Value'].values[0]
-                return val, val
+        def get_valid_prices(ticker):
+            if ticker in ['INTL_FLAT', 'HOME']:
+                v = df.loc[df['Ticker']==ticker, 'Base_Value'].values[0]
+                return v, v
             try:
-                current = stock_data[ticker]['Close'].iloc[-1]
-                prev = stock_data[ticker]['Close'].iloc[-2]
+                # This grabs only non-empty price rows
+                valid_closes = stock_data[ticker]['Close'].dropna()
+                # Most recent price (Friday 4/5 PM if it's the weekend)
+                current = valid_closes.iloc[-1]
+                # Price before that (Thursday close if it's the weekend)
+                prev = valid_closes.iloc[-2]
                 return current, prev
             except:
                 return 0, 0
 
-        df[['Price', 'Prev_Price']] = df.apply(lambda x: pd.Series(get_prices(x['Ticker'])), axis=1)
+        df[['Price', 'Prev_Price']] = df.apply(lambda x: pd.Series(get_valid_prices(x['Ticker'])), axis=1)
     except:
         df['Price'] = 0
         df['Prev_Price'] = 0
         
     df['Current_Value'] = df['Price'] * df['Quantity']
     df['Prev_Value'] = df['Prev_Price'] * df['Quantity']
-    # If the asset is flat (International/Home), use Base_Value
-    df.loc[df['Ticker'].isin(['INTL_FLAT', 'HOME']), 'Current_Value'] = df['Base_Value']
-    df.loc[df['Ticker'].isin(['INTL_FLAT', 'HOME']), 'Prev_Value'] = df['Base_Value']
     
-    df['Day_Change_Dollar'] = df['Current_Value'] - df['Prev_Value']
+    # Overwrite flat assets
+    df.loc[df['Ticker'].isin(['INTL_FLAT', 'HOME']), ['Current_Value', 'Prev_Value']] = df['Base_Value']
+    
+    # Final cleanup to prevent NaNs
+    df['Day_Change_Dollar'] = (df['Current_Value'] - df['Prev_Value']).fillna(0)
     return df
 
 df = load_and_pulse_data()
@@ -102,7 +100,7 @@ st.title("🔥 FIRE Pulse")
 st.subheader(f"Strategy Roadmap | Goal: ${TARGET_FIRE_FUND:,.0f} by {TARGET_YEAR}")
 
 m1, m2, m3, m4 = st.columns(4)
-m1.metric("Total Net Worth", f"${total_nw:,.0f}", delta=f"${total_day_change:,.2f} Today")
+m1.metric("Total Net Worth", f"${total_nw:,.0f}", delta=f"${total_day_change:,.2f} (Latest Change)")
 m2.metric("FIRE Fund Status", f"${fire_fund_current:,.0f}")
 m3.metric("Goal Progress", f"{fire_progress:.1f}%")
 m4.metric("Assets Tracked", len(df))
@@ -118,16 +116,19 @@ with col_left:
     st.plotly_chart(fig, use_container_width=True)
 
 with col_right:
-    st.subheader("Today's Movers")
+    st.subheader("Latest Pulse")
     pulse_df = df[df['Day_Change_Dollar'] != 0].sort_values('Day_Change_Dollar', key=abs, ascending=False).head(10)
-    for _, row in pulse_df.iterrows():
-        color = "#28a745" if row['Day_Change_Dollar'] > 0 else "#dc3545"
-        st.markdown(f"**{row['Name']}**: <span style='color:{color}'>${row['Day_Change_Dollar']:,.2f}</span>", unsafe_allow_html=True)
+    
+    if not pulse_df.empty:
+        for _, row in pulse_df.iterrows():
+            color = "#28a745" if row['Day_Change_Dollar'] > 0 else "#dc3545"
+            st.markdown(f"**{row['Name']}**: <span style='color:{color}'>${row['Day_Change_Dollar']:,.2f}</span>", unsafe_allow_html=True)
+    else:
+        st.info("No significant price changes recorded recently.")
 
 st.divider()
 
 st.subheader("Holdings Breakdown")
-# Table includes BTC now
 st.dataframe(df[['Name', 'Category', 'Quantity', 'Price', 'Current_Value', 'Day_Change_Dollar']].sort_values('Current_Value', ascending=False).style.format({
     'Price': '${:,.2f}', 'Current_Value': '${:,.2f}', 'Day_Change_Dollar': '${:,.2f}'
 }), use_container_width=True, hide_index=True)
