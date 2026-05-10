@@ -75,4 +75,59 @@ def load_and_pulse_data():
             except:
                 return 0, 0
 
-        df[['
+        df[['Price', 'Prev_Price']] = df.apply(lambda x: pd.Series(get_prices(x['Ticker'])), axis=1)
+    except:
+        df['Price'] = 0
+        df['Prev_Price'] = 0
+        
+    df['Current_Value'] = df['Price'] * df['Quantity']
+    df['Prev_Value'] = df['Prev_Price'] * df['Quantity']
+    # If the asset is flat (International/Home), use Base_Value
+    df.loc[df['Ticker'].isin(['INTL_FLAT', 'HOME']), 'Current_Value'] = df['Base_Value']
+    df.loc[df['Ticker'].isin(['INTL_FLAT', 'HOME']), 'Prev_Value'] = df['Base_Value']
+    
+    df['Day_Change_Dollar'] = df['Current_Value'] - df['Prev_Value']
+    return df
+
+df = load_and_pulse_data()
+
+# --- CALCULATIONS ---
+total_nw = df['Current_Value'].sum()
+total_day_change = df['Day_Change_Dollar'].sum()
+fire_fund_current = df[df['Ticker'] != 'HOME']['Current_Value'].sum()
+fire_progress = (fire_fund_current / TARGET_FIRE_FUND) * 100
+
+# --- DASHBOARD UI ---
+st.title("🔥 FIRE Pulse")
+st.subheader(f"Strategy Roadmap | Goal: ${TARGET_FIRE_FUND:,.0f} by {TARGET_YEAR}")
+
+m1, m2, m3, m4 = st.columns(4)
+m1.metric("Total Net Worth", f"${total_nw:,.0f}", delta=f"${total_day_change:,.2f} Today")
+m2.metric("FIRE Fund Status", f"${fire_fund_current:,.0f}")
+m3.metric("Goal Progress", f"{fire_progress:.1f}%")
+m4.metric("Assets Tracked", len(df))
+
+st.divider()
+
+col_left, col_right = st.columns([1.5, 1])
+
+with col_left:
+    st.subheader("Asset Allocation")
+    fig = px.pie(df, values='Current_Value', names='Category', hole=0.5, color_discrete_sequence=px.colors.sequential.Teal)
+    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"))
+    st.plotly_chart(fig, use_container_width=True)
+
+with col_right:
+    st.subheader("Today's Movers")
+    pulse_df = df[df['Day_Change_Dollar'] != 0].sort_values('Day_Change_Dollar', key=abs, ascending=False).head(10)
+    for _, row in pulse_df.iterrows():
+        color = "#28a745" if row['Day_Change_Dollar'] > 0 else "#dc3545"
+        st.markdown(f"**{row['Name']}**: <span style='color:{color}'>${row['Day_Change_Dollar']:,.2f}</span>", unsafe_allow_html=True)
+
+st.divider()
+
+st.subheader("Holdings Breakdown")
+# Table includes BTC now
+st.dataframe(df[['Name', 'Category', 'Quantity', 'Price', 'Current_Value', 'Day_Change_Dollar']].sort_values('Current_Value', ascending=False).style.format({
+    'Price': '${:,.2f}', 'Current_Value': '${:,.2f}', 'Day_Change_Dollar': '${:,.2f}'
+}), use_container_width=True, hide_index=True)
