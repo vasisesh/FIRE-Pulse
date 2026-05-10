@@ -2,92 +2,85 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 import plotly.express as px
-import plotly.graph_objects as go
+from datetime import datetime
 
 # --- APP CONFIG ---
-st.set_page_config(page_title="FIRE Pulse", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="FIRE Pulse", layout="wide")
 
 # --- STYLING ---
 st.markdown("""
     <style>
-    .main { background-color: #f5f7f9; }
-    .stMetric { background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; border: 1px solid #e6e9ef; }
+    [data-testid="stMetricValue"] { font-size: 28px; color: #1f77b4; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- SIDEBAR / SETTINGS ---
-with st.sidebar:
-    st.title("🔥 FIRE Pulse")
-    st.subheader("Configuration")
-    annual_expenses = st.number_input("Annual Target Expenses ($)", value=80000, step=5000)
-    fire_multiplier = st.slider("FIRE Multiplier (e.g. 25x)", 20, 33, 25)
-    fire_number = annual_expenses * fire_multiplier
-    st.divider()
-    st.info(f"Target FIRE Number: ${fire_number:,.0f}")
+# --- CONFIGURATION & GOALS ---
+TARGET_FIRE_FUND = 500000
+TARGET_YEAR = 2030
+CURRENT_DATE = datetime.now()
+YEARS_REMAINING = TARGET_YEAR - CURRENT_DATE.year
 
-# --- DATA LOADING (Mock Data for initial setup) ---
-@st.cache_data
+# --- DATA LOADING ---
 def load_data():
-    # Replace this with pd.read_csv('holdings.csv') later
+    # Adding your International Holdings at a flat $300,000
     data = {
-        'Category': ['Equity', 'Equity', 'Equity', 'Real Estate', 'Cash'],
-        'Ticker': ['NVDA', 'VTI', 'AVGO', 'HOME', 'CASH'],
-        'Name': ['NVIDIA', 'Vanguard Total Stock', 'Broadcom', 'Primary Residence', 'HYSA'],
-        'Quantity': [10, 100, 5, 1, 1],
-        'Cost_Basis': [400, 210, 800, 600000, 50000]
+        'Category': ['Equity', 'Equity', 'International', 'Real Estate', 'Cash'],
+        'Ticker': ['NVDA', 'VTI', 'INTL_FLAT', 'HOME', 'CASH'],
+        'Name': ['NVIDIA', 'Vanguard Total Stock', 'International Holdings', 'Primary Residence', 'HYSA'],
+        'Quantity': [10, 100, 1, 1, 1],
+        'Value': [0, 0, 300000, 600000, 50000] # Equities updated live below
     }
     return pd.DataFrame(data)
 
-df = load_data()
-
-# --- LIVE PRICE UPDATES ---
 def get_live_prices(df):
-    tickers = [t for t in df['Ticker'].tolist() if t not in ['HOME', 'CASH']]
-    if tickers:
-        stock_data = yf.download(tickers, period="1d")['Close'].iloc[-1]
-        df['Current_Price'] = df.apply(lambda x: stock_data[x['Ticker']] if x['Ticker'] in stock_data else x['Cost_Basis'], axis=1)
-    else:
-        df['Current_Price'] = df['Cost_Basis']
+    # Only fetch for actual stock tickers
+    tickers = ['NVDA', 'VTI']
+    stock_data = yf.download(tickers, period="1d")['Close'].iloc[-1]
     
-    df['Current_Value'] = df['Quantity'] * df['Current_Price']
+    # Update equity values, keep flat values for others
+    df.loc[df['Ticker'] == 'NVDA', 'Value'] = stock_data['NVDA'] * 10
+    df.loc[df['Ticker'] == 'VTI', 'Value'] = stock_data['VTI'] * 100
     return df
 
-df = get_live_prices(df)
-total_net_worth = df['Current_Value'].sum()
-fire_progress = (total_net_worth / fire_number) * 100
+df = get_live_prices(load_data())
+total_net_worth = df['Value'].sum()
 
-# --- DASHBOARD LAYOUT ---
-st.title("Investment Dashboard")
+# Assuming "FIRE Fund" consists of Equities + International + Cash (excluding Home Equity)
+fire_fund_current = df[df['Ticker'] != 'HOME']['Value'].sum()
+fire_fund_progress = (fire_fund_current / TARGET_FIRE_FUND) * 100
 
-# Top Row: KPI Metrics
-col1, col2, col3 = st.columns(3)
-col1.metric("Net Worth", f"${total_net_worth:,.2f}", delta=f"{((total_net_worth/df['Cost_Basis'].sum())-1)*100:.1f}%")
-col2.metric("FIRE Progress", f"{fire_progress:.1f}%")
-col3.metric("Gap to Goal", f"${max(0, fire_number - total_net_worth):,.0f}")
+# --- DASHBOARD UI ---
+st.title("🔥 FIRE Pulse: Roadmap to 2030")
+
+# Top Row: The Big Picture
+m1, m2, m3, m4 = st.columns(4)
+m1.metric("Total Net Worth", f"${total_net_worth:,.0f}")
+m2.metric("FIRE Fund Status", f"${fire_fund_current:,.0f}")
+m3.metric("Goal Progress", f"{fire_fund_progress:.1f}%")
+m4.metric("Years to 2030", f"{YEARS_REMAINING}")
 
 st.divider()
 
-# Middle Row: Visuals
-left_chart, right_chart = st.columns([1, 1])
+# Progress Bar toward the $500k Goal
+st.subheader(f"Progress toward ${TARGET_FIRE_FUND:,.0f} FIRE Fund")
+st.progress(min(fire_fund_progress / 100, 1.0))
+st.caption(f"Remaining to reach goal: ${max(0, TARGET_FIRE_FUND - fire_fund_current):,.0f}")
 
-with left_chart:
-    st.subheader("Asset Allocation")
-    fig_pie = px.pie(df, values='Current_Value', names='Category', hole=0.5,
-                 color_discrete_sequence=px.colors.sequential.RdBu)
-    fig_pie.update_layout(margin=dict(t=0, b=0, l=0, r=0))
-    st.plotly_chart(fig_pie, use_container_width=True)
+col_left, col_right = st.columns([1, 1])
 
-with right_chart:
-    st.subheader("Holdings Value")
-    fig_bar = px.bar(df.sort_values('Current_Value'), x='Current_Value', y='Name', 
-                     orientation='h', color='Category',
-                     color_discrete_sequence=px.colors.qualitative.Prism)
-    st.plotly_chart(fig_bar, use_container_width=True)
+with col_left:
+    st.subheader("Asset Distribution")
+    # Sunburst chart looks very premium for diverse holdings
+    fig = px.sunburst(df, path=['Category', 'Name'], values='Value',
+                  color='Value', color_continuous_scale='RdBu')
+    st.plotly_chart(fig, use_container_width=True)
 
-# Bottom: Data Table
-st.subheader("Detailed Portfolio Breakdown")
-st.dataframe(df.style.format({
-    'Cost_Basis': '${:,.2f}',
-    'Current_Price': '${:,.2f}',
-    'Current_Value': '${:,.2f}'
-}), use_container_width=True)
+with col_right:
+    st.subheader("Holdings Detail")
+    # Clean table for quick review
+    st.dataframe(df[['Name', 'Category', 'Value']].sort_values('Value', ascending=False), 
+                 use_container_width=True, hide_index=True)
+
+# Milestone Note
+st.info(f"💡 To hit your 2030 goal, you are currently tracking at {fire_fund_progress:.1f}% of your target fund.")
