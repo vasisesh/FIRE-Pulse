@@ -18,13 +18,20 @@ st.markdown("""
 @st.cache_data(ttl=300)
 def load_robinhood_data():
     df = pd.read_csv("portfolio.csv", on_bad_lines='skip')
-    # Clean all column names and string values of hidden spaces
+    
+    # Clean column headers
     df.columns = [c.strip() for c in df.columns]
-    df = df.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
     
-    # Strict Robinhood Filter (now space-proof)
-    df = df[df['Category'].fillna('').str.contains('Robinhood', case=False)].copy()
+    # Precision cleaning: Only strip whitespace from text columns
+    text_cols = ['Ticker', 'Category', 'Account Type']
+    for col in text_cols:
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.strip()
     
+    # Strict Robinhood Filter
+    df = df[df['Category'].str.contains('Robinhood', case=False, na=False)].copy()
+    
+    # Force numeric conversion for value columns
     df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce').fillna(0)
     df['Purchase Price'] = pd.to_numeric(df['Purchase Price'], errors='coerce').fillna(0)
 
@@ -46,7 +53,6 @@ try:
     df = load_robinhood_data()
     
     st.title("🔥 FIRE Pulse: Robinhood Core")
-    # This total is the sum of every row that passed the 'Robinhood' filter
     st.metric("📦 TOTAL ROBINHOOD ASSETS", fmt(df['Current Value'].sum()))
     st.divider()
 
@@ -56,7 +62,7 @@ try:
         st.write(f"### 🏗️ All Robinhood Holdings ({len(df)} positions)")
         disp = df[df['Current Value'] > 0][['Ticker', 'Account Type', 'Current Value']]
         
-        # FIX: Added 'height=None' to force the table to show all rows without a scrollbar
+        # Using use_container_width and height=None for full visibility
         st.dataframe(
             disp.sort_values('Current Value', ascending=False).style.format({'Current Value': fmt}),
             use_container_width=True, 
@@ -73,4 +79,4 @@ try:
         )
 
 except Exception as e:
-    st.error(f"Syncing Error: {e}")
+    st.error(f"Waiting for Data... (Technical Note: {e})")
