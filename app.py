@@ -9,12 +9,34 @@ from datetime import datetime
 # --- APP CONFIG ---
 st.set_page_config(page_title="FIRE Pulse", layout="wide")
 
-# --- STYLING ---
+# --- STYLING (Fixed for Visibility) ---
 st.markdown("""
     <style>
-    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; border: 1px solid #e6e9ef; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); }
-    .main { background-color: #f8f9fa; }
-    [data-testid="stMetricDelta"] svg { display: none; } 
+    /* Card Styling */
+    [data-testid="stMetric"] {
+        background-color: #ffffff;
+        padding: 20px;
+        border-radius: 12px;
+        border: 1px solid #d1d5db;
+        box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+    }
+    /* Force Label Color (Small Text) */
+    [data-testid="stMetricLabel"] {
+        color: #4b5563 !important;
+        font-weight: 600 !important;
+    }
+    /* Force Value Color (Big Numbers) */
+    [data-testid="stMetricValue"] {
+        color: #111827 !important;
+        font-weight: 800 !important;
+    }
+    /* Hide the default delta arrow for a cleaner look */
+    [data-testid="stMetricDelta"] svg {
+        display: none;
+    }
+    .main {
+        background-color: #0e1117;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -37,7 +59,6 @@ def load_and_pulse_data():
     
     tickers = ['NVDA', 'VTI']
     try:
-        # Fetch 2 days of data for the 'Pulse' comparison
         stock_data = yf.download(tickers, period="2d", group_by='ticker', progress=False)
         current_prices = {t: stock_data[t]['Close'].iloc[-1] for t in tickers}
         prev_closes = {t: stock_data[t]['Close'].iloc[-2] for t in tickers}
@@ -67,7 +88,7 @@ fire_progress = (fire_fund_current / TARGET_FIRE_FUND) * 100
 st.title("🔥 FIRE Pulse")
 st.subheader(f"Strategy Roadmap to {TARGET_YEAR}")
 
-# Row 1: Metrics
+# Row 1: Metrics (Now with visible colors)
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("Total Net Worth", f"${total_nw:,.0f}", delta=f"${total_day_change:,.2f} Today")
 m2.metric("Daily Change (%)", f"{day_change_pct:.2f}%")
@@ -81,7 +102,6 @@ left_col, right_col = st.columns([2, 1])
 
 with left_col:
     st.subheader("Asset Allocation")
-    # Fixed the parenthesis error here
     fig_pie = px.pie(
         df, 
         values='Current_Value', 
@@ -89,7 +109,12 @@ with left_col:
         hole=0.5, 
         color_discrete_sequence=px.colors.sequential.Teal
     )
-    fig_pie.update_layout(margin=dict(t=20, b=20, l=20, r=20))
+    fig_pie.update_layout(
+        margin=dict(t=20, b=20, l=20, r=20),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color="white")
+    )
     st.plotly_chart(fig_pie, use_container_width=True)
 
 with right_col:
@@ -111,10 +136,3 @@ st.dataframe(df[['Name', 'Category', 'Quantity', 'Current_Value', 'Day_Change_Do
     'Current_Value': '${:,.0f}',
     'Day_Change_Dollar': '${:,.2f}'
 }), use_container_width=True, hide_index=True)
-
-# Final insight
-if fire_progress >= 100:
-    st.balloons()
-    st.success("You've hit your FIRE Fund goal! 2030 is looking bright.")
-else:
-    st.info(f"💡 You are ${TARGET_FIRE_FUND - fire_fund_current:,.0f} away from your {TARGET_YEAR} milestone.")
