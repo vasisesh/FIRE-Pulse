@@ -34,7 +34,6 @@ def calculate_dynamic_values():
     m_bal = 480000 * (r_h + 1)**h_months - (m_pay / r_h) * ((r_h + 1)**h_months - 1)
     h_val = 600000 * (1 + (1.025**(1/12)-1))**h_months
     
-    # 401k Growth Engine ($33k/year total)
     c_start = datetime(2026, 1, 1)
     days_passed = (now - c_start).days
     biweekly_periods = max(0, days_passed // 14)
@@ -152,37 +151,51 @@ col3.metric("Gap to $2.5M", f"${max(0, NW_TARGET - nw):,.0f}")
 
 st.divider()
 
-c1, c2 = st.columns(2)
-with c1:
+# Progress Section
+prog_l, prog_r = st.columns(2)
+with prog_l:
     st.subheader(f"FIRE Goal ($1M): {fire_pct:.1%}")
     st.progress(fire_pct)
-with c2:
+with prog_r:
     st.subheader(f"Net Worth Goal ($2.5M): {nw_pct:.1%}")
     st.progress(nw_pct)
 
 st.divider()
 
-# Visuals
-charts_left, summary_right = st.columns([1.5, 1])
-with charts_left:
-    st.subheader("Asset Allocation")
-    fig = px.pie(df[df['Curr'] > 0], values='Curr', names='Pillar', hole=0.5, color_discrete_sequence=px.colors.sequential.Teal)
-    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"))
-    st.plotly_chart(fig, use_container_width=True)
-with summary_right:
-    st.subheader("Pillar Summary")
-    for p in ['Robinhood', 'ETRADE', 'Retirement', 'College Fund', 'Non-US/India', 'Cash', 'Real Estate']:
-        val = df[df['Pillar'] == p]['Curr'].sum()
-        st.write(f"**{p}**: ${val:,.0f}")
+# --- NEW: Top Robinhood Holdings Chart ---
+rh_df = df[df['Pillar'] == 'Robinhood'].copy()
+rh_total = rh_df['Curr'].sum()
+rh_df['Port_%'] = (rh_df['Curr'] / rh_total) * 100
+top_10_rh = rh_df.sort_values('Curr', ascending=False).head(10)
+
+st.subheader("Top 10 Robinhood Holdings")
+fig_rh = px.bar(
+    top_10_rh, 
+    x='Name', 
+    y='Curr', 
+    text_auto='.2s',
+    labels={'Curr': 'Value ($)', 'Name': 'Ticker'},
+    color='Curr',
+    color_continuous_scale='Teals',
+    hover_data={'Curr': ':$,.2f', 'Port_%': ':.2f%'}
+)
+fig_rh.update_layout(
+    showlegend=False, 
+    coloraxis_showscale=False,
+    paper_bgcolor='rgba(0,0,0,0)',
+    plot_bgcolor='rgba(0,0,0,0)',
+    font=dict(color="white")
+)
+st.plotly_chart(fig_rh, use_container_width=True)
 
 st.divider()
-st.subheader("Full Ledger (Daily Movement)")
 
+# Ledger Section
+st.subheader("Full Ledger (Daily Movement)")
 def color_change(val):
     color = '#28a745' if val > 0 else '#dc3545' if val < 0 else 'white'
     return f'color: {color}'
 
-# FIX: Using .map instead of .applymap for compatibility
 st.dataframe(
     df[['Pillar', 'Name', 'Curr', 'Chg_$', 'Chg_%']]
     .sort_values(['Pillar', 'Curr'], ascending=False)
