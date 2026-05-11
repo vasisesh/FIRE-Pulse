@@ -6,16 +6,57 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
 # --- APP CONFIG ---
-st.set_page_config(page_title="FIRE Pulse", layout="wide")
+st.set_page_config(page_title="FIRE Pulse V2", layout="wide")
 
-# --- STYLING ---
+# --- VERSION 2: OBSIDIAN & EMERALD STYLING ---
 st.markdown("""
     <style>
-    [data-testid="stMetric"] { background-color: #ffffff; padding: 20px; border-radius: 12px; border: 1px solid #d1d5db; box-shadow: 2px 2px 10px rgba(0,0,0,0.1); }
-    [data-testid="stMetricLabel"] { color: #4b5563 !important; font-weight: 600 !important; }
-    [data-testid="stMetricValue"] { color: #111827 !important; font-weight: 800 !important; }
-    .main { background-color: #0e1117; }
-    .stProgress > div > div > div > div { background-image: linear-gradient(to right, #008080 , #00ffcc); }
+    /* Main Background */
+    .stApp {
+        background-color: #0B0E14;
+        color: #E0E0E0;
+    }
+    
+    /* Modern Glassmorphic Cards */
+    [data-testid="stMetric"] {
+        background: rgba(255, 255, 255, 0.03) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 16px !important;
+        padding: 25px !important;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3) !important;
+    }
+    
+    /* Metric Typography */
+    [data-testid="stMetricLabel"] {
+        color: #B0B0B0 !important;
+        font-size: 0.9rem !important;
+        font-weight: 500 !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    [data-testid="stMetricValue"] {
+        color: #00E676 !important; /* Emerald Green */
+        font-family: 'JetBrains Mono', 'Roboto Mono', monospace !important;
+        font-weight: 800 !important;
+        font-size: 1.8rem !important;
+    }
+    
+    /* Custom Progress Bar Glow */
+    .stProgress > div > div > div > div {
+        background-image: linear-gradient(to right, #00C853 , #B2FF59);
+        box-shadow: 0 0 10px rgba(0, 230, 118, 0.4);
+    }
+
+    /* Scrollbar Styling */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #0B0E14; }
+    ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+    
+    /* Table Headers */
+    thead tr th {
+        background-color: #151921 !important;
+        color: #00E676 !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -37,17 +78,15 @@ def calculate_dynamic_values():
     c_start = datetime(2026, 1, 1)
     days_passed = (now - c_start).days
     biweekly_periods = max(0, days_passed // 14)
-    total_401k_contributions = biweekly_periods * 1269.23
+    total_401k = biweekly_periods * 1269.23
     
-    hsa_past_principal = 7750 + 8300 + 8300
-    hsa_2026_months = (now.year - 2026) * 12 + now.month
-    hsa_2026_contrib = max(0, hsa_2026_months * 712.50)
-    total_hsa_principal = hsa_past_principal + hsa_2026_contrib
+    hsa_base = 7750 + 8300 + 8300
+    hsa_2026 = max(0, ((now.year - 2026) * 12 + now.month) * 712.50)
     
-    return h_val, m_bal, total_401k_contributions, total_hsa_principal
+    return h_val, m_bal, total_401k, (hsa_base + hsa_2026)
 
 def load_all_pillars():
-    h_val, m_bal, auto_401k, hsa_principal = calculate_dynamic_values()
+    h_val, m_bal, auto_401k, hsa_p = calculate_dynamic_values()
     data = [
         # PILLAR 1: Robinhood
         {'Name': 'AAPL', 'Tkr': 'AAPL', 'Qty': 32.875151, 'Pillar': 'Robinhood'},
@@ -104,7 +143,7 @@ def load_all_pillars():
         {'Name': 'FELG (Roth IRA)', 'Tkr': 'FELG', 'Qty': 386, 'Pillar': 'Retirement'},
         {'Name': 'WFSPX (Roth 401k)', 'Tkr': 'WFSPX', 'Qty': 157.092, 'Pillar': 'Retirement'},
         {'Name': 'JLGMX (Roth 401k)', 'Tkr': 'JLGMX', 'Qty': 641.5629, 'Pillar': 'Retirement'},
-        {'Name': 'Auto 401k Principal', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Retirement', 'Base': auto_401k},
+        {'Name': 'Auto 401k Growth', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Retirement', 'Base': auto_401k},
         
         # PILLAR 4: College Fund
         {'Name': 'VTSAX (College)', 'Tkr': 'VTSAX', 'Qty': 209.296, 'Pillar': 'College Fund'},
@@ -112,7 +151,7 @@ def load_all_pillars():
         
         # PILLAR 5: Non-US/India & HSA
         {'Name': 'India Assets', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Non-US/India', 'Base': 300000},
-        {'Name': 'HSA (VTSAX Invested)', 'Tkr': 'VTSAX', 'Qty': (hsa_principal / 115), 'Pillar': 'Non-US/India'},
+        {'Name': 'HSA (VTSAX)', 'Tkr': 'VTSAX', 'Qty': (hsa_p / 118), 'Pillar': 'Non-US/India'},
 
         # PILLAR 6: Cash
         {'Name': 'HYSA Savings', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Cash', 'Base': 40000},
@@ -131,8 +170,7 @@ def load_all_pillars():
             return valid.iloc[-1] * r['Qty'], valid.iloc[-2] * r['Qty']
         df[['Curr', 'Prev']] = df.apply(lambda x: pd.Series(get_v(x)), axis=1)
     except:
-        df['Curr'] = df.get('Base', 0)
-        df['Prev'] = df['Curr']
+        df['Curr'] = df.get('Base', 0); df['Prev'] = df['Curr']
     
     df['Chg_$'] = (df['Curr'] - df['Prev']).fillna(0)
     df['Chg_%'] = ((df['Curr'] / df['Prev'] - 1) * 100).fillna(0)
@@ -150,83 +188,72 @@ fire_cur = df[df['Pillar'].isin(['Robinhood', 'ETRADE', 'Non-US/India', 'Cash'])
 fire_pct = min(fire_cur / FIRE_TARGET, 1.0)
 nw_goal_pct = min(nw_curr / NW_TARGET, 1.0)
 
-# --- DASHBOARD ---
-st.title("🔥 FIRE Pulse")
+# --- DASHBOARD UI ---
+st.title("🛡️ FIRE PULSE V2")
+st.caption("Strategic Wealth Control • Obsidian Edition")
 
-col1, col2, col3 = st.columns(3)
-col1.metric("Total Net Worth", f"${nw_curr:,.0f}", delta=f"${nw_chg_dollar:,.2f} ({nw_chg_pct:.2f}%)")
-col2.metric("FIRE Asset Value", f"${fire_cur:,.0f}")
-col3.metric("Gap to $2.5M", f"${max(0, NW_TARGET - nw_curr):,.0f}")
+m1, m2, m3 = st.columns(3)
+m1.metric("NET WORTH", f"${nw_curr:,.0f}", delta=f"${nw_chg_dollar:,.2f} ({nw_chg_pct:.2f}%)")
+m2.metric("LIQUID FIRE", f"${fire_cur:,.0f}")
+m3.metric("GAP TO $2.5M", f"${max(0, NW_TARGET - nw_curr):,.0f}")
 
 st.divider()
 
-c1, c2 = st.columns(2)
-with c1:
-    st.subheader(f"FIRE Goal ($1M): {fire_pct:.1%}")
+p_col1, p_col2 = st.columns(2)
+with p_col1:
+    st.subheader(f"FIRE TARGET ($1M) • {fire_pct:.1%}")
     st.progress(fire_pct)
-with c2:
-    st.subheader(f"Net Worth Goal ($2.5M): {nw_goal_pct:.1%}")
+with p_col2:
+    st.subheader(f"NET WORTH TARGET ($2.5M) • {nw_goal_pct:.1%}")
     st.progress(nw_goal_pct)
 
 st.divider()
 
-# Allocation & Summary
-l_col, r_col = st.columns([1.5, 1])
-with l_col:
-    st.subheader("Asset Allocation by Pillar")
-    fig_pie = px.pie(df[df['Curr'] > 0], values='Curr', names='Pillar', hole=0.5, color_discrete_sequence=px.colors.sequential.Teal)
-    fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"))
+# Charts
+c_left, c_right = st.columns([1.5, 1])
+with c_left:
+    st.subheader("PILLAR ALLOCATION")
+    fig_pie = px.pie(df[df['Curr'] > 0], values='Curr', names='Pillar', hole=0.6, 
+                     color_discrete_sequence=px.colors.sequential.Tealgrn)
+    fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', font=dict(color="#B0B0B0"), showlegend=True)
     st.plotly_chart(fig_pie, use_container_width=True)
-with r_col:
-    st.subheader("Pillar Summary")
+
+with c_right:
+    st.subheader("COMPONENT SUMMARY")
     p_sum = df.groupby('Pillar')['Curr'].sum()
     for p in ['Robinhood', 'ETRADE', 'Retirement', 'College Fund', 'Non-US/India', 'Cash', 'Real Estate']:
-        st.write(f"**{p}**: ${p_sum.get(p, 0):,.0f}")
+        val = p_sum.get(p, 0)
+        st.markdown(f"**{p}** <span style='float:right; color:#00E676;'>${val:,.0f}</span>", unsafe_allow_html=True)
+        st.progress(min(val/1000000, 1.0))
 
 st.divider()
 
-# --- Top Robinhood Holdings Visuals ---
+# Top 10 RH
 rh_df = df[df['Pillar'] == 'Robinhood'].copy()
 rh_total = rh_df['Curr'].sum()
 rh_df['Port_%'] = (rh_df['Curr'] / rh_total) * 100
-top_10_rh = rh_df.sort_values('Curr', ascending=False).head(10)
+top_10 = rh_df.sort_values('Curr', ascending=False).head(10)
 
-st.subheader("Top 10 Robinhood Concentration")
-t10_col_chart, t10_col_table = st.columns([1.5, 1])
-
-with t10_col_chart:
-    fig_rh = px.bar(
-        top_10_rh, x='Name', y='Curr', text_auto='.2s',
-        color='Curr', color_continuous_scale='teal',
-        hover_data={'Curr': ':$,.2f', 'Port_%': ':.2f%'}
-    )
-    fig_rh.update_layout(
-        showlegend=False, coloraxis_showscale=False,
-        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color="white")
-    )
-    st.plotly_chart(fig_rh, use_container_width=True)
-
-with t10_col_table:
-    st.write("**Top 10 List**")
-    st.dataframe(
-        top_10_rh[['Name', 'Curr', 'Port_%']]
-        .style.format({'Curr': '${:,.2f}', 'Port_%': '{:,.2f}%'}),
-        use_container_width=True, hide_index=True
-    )
+st.subheader("ROBINHOOD TOP 10 CONCENTRATION")
+fig_rh = px.bar(top_10, x='Name', y='Curr', text_auto='.2s', color='Curr', 
+                color_continuous_scale='tealgrn', hover_data={'Port_%': ':.2f%'})
+fig_rh.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color="#B0B0B0"), coloraxis_showscale=False)
+st.plotly_chart(fig_rh, use_container_width=True)
 
 st.divider()
 
-# Full Ledger Section
-st.subheader("Full Ledger (Daily Movement)")
-def color_change(val):
-    if val > 0: return 'color: #28a745'
-    elif val < 0: return 'color: #dc3545'
-    return 'color: white'
+# Ledger
+st.subheader("MASTER ASSET LEDGER")
+def style_ledger(val):
+    if isinstance(val, (int, float)):
+        if val > 0: return 'color: #00E676'
+        if val < 0: return 'color: #FF5252'
+    return 'color: #E0E0E0'
 
 st.dataframe(
     df[['Pillar', 'Name', 'Curr', 'Chg_$', 'Chg_%']]
     .sort_values(['Pillar', 'Curr'], ascending=False)
     .style.format({'Curr': '${:,.2f}', 'Chg_$': '${:,.2f}', 'Chg_%': '{:,.2f}%'})
-    .map(color_change, subset=['Chg_$', 'Chg_%']), 
+    .map(style_ledger, subset=['Chg_$', 'Chg_%']),
     use_container_width=True, hide_index=True
 )
