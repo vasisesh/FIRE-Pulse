@@ -1,259 +1,92 @@
 import streamlit as st
 import pandas as pd
-import yfinance as yf
-import plotly.express as px
+import numpy as np
+import plotly.graph_objects as go
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
-# --- APP CONFIG ---
-st.set_page_config(page_title="FIRE Pulse V2", layout="wide")
-
-# --- VERSION 2: OBSIDIAN & EMERALD STYLING ---
+# --- APP CONFIG & THEME ---
+st.set_page_config(page_title="FIRE Pulse V2.3", layout="wide")
 st.markdown("""
     <style>
-    /* Main Background */
-    .stApp {
-        background-color: #0B0E14;
-        color: #E0E0E0;
-    }
-    
-    /* Modern Glassmorphic Cards */
-    [data-testid="stMetric"] {
-        background: rgba(255, 255, 255, 0.03) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-radius: 16px !important;
-        padding: 25px !important;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3) !important;
-    }
-    
-    /* Metric Typography */
-    [data-testid="stMetricLabel"] {
-        color: #B0B0B0 !important;
-        font-size: 0.9rem !important;
-        font-weight: 500 !important;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-    [data-testid="stMetricValue"] {
-        color: #00E676 !important; /* Emerald Green */
-        font-family: 'JetBrains Mono', 'Roboto Mono', monospace !important;
-        font-weight: 800 !important;
-        font-size: 1.8rem !important;
-    }
-    
-    /* Custom Progress Bar Glow */
-    .stProgress > div > div > div > div {
-        background-image: linear-gradient(to right, #00C853 , #B2FF59);
-        box-shadow: 0 0 10px rgba(0, 230, 118, 0.4);
-    }
-
-    /* Scrollbar Styling */
-    ::-webkit-scrollbar { width: 8px; }
-    ::-webkit-scrollbar-track { background: #0B0E14; }
-    ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
-    
-    /* Table Headers */
-    thead tr th {
-        background-color: #151921 !important;
-        color: #00E676 !important;
-    }
+    .stApp { background-color: #0B0E14; color: #E0E0E0; }
+    [data-testid="stMetric"] { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; }
+    [data-testid="stMetricValue"] { color: #00E676 !important; font-family: 'JetBrains Mono', monospace; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- CONSTANTS ---
-FIRE_TARGET = 1000000
-NW_TARGET = 2500000
+# --- SIDEBAR CONTROLS ---
+st.sidebar.header("🕹️ Simulation Controls")
+adjust_inflation = st.sidebar.toggle("Adjust for Inflation (Real Dollars)", value=False)
+nominal_growth = st.sidebar.slider("Nominal Market Growth (%)", 4.0, 12.0, 7.0) / 100
+inflation_rate = 0.03 # 2026-2035 Estimated Anchor
 
-# --- ENGINES ---
-def calculate_dynamic_values():
-    now = datetime.now()
-    h_start = datetime(2022, 4, 1)
-    h_delta = relativedelta(now, h_start)
-    h_months = h_delta.years * 12 + h_delta.months
-    r_h, n_h = 0.0299 / 12, 15 * 12
-    m_pay = 480000 * (r_h * (1 + r_h)**n_h) / ((1 + r_h)**n_h - 1)
-    m_bal = 480000 * (r_h + 1)**h_months - (m_pay / r_h) * ((r_h + 1)**h_months - 1)
-    h_val = 600000 * (1 + (1.025**(1/12)-1))**h_months
-    
-    c_start = datetime(2026, 1, 1)
-    days_passed = (now - c_start).days
-    biweekly_periods = max(0, days_passed // 14)
-    total_401k = biweekly_periods * 1269.23
-    
-    hsa_base = 7750 + 8300 + 8300
-    hsa_2026 = max(0, ((now.year - 2026) * 12 + now.month) * 712.50)
-    
-    return h_val, m_bal, total_401k, (hsa_base + hsa_2026)
+# Logic for "Real" vs "Nominal"
+display_rate = nominal_growth - inflation_rate if adjust_inflation else nominal_growth
+mode_label = "Real (Purchasing Power)" if adjust_inflation else "Nominal (Face Value)"
 
-def load_all_pillars():
-    h_val, m_bal, auto_401k, hsa_p = calculate_dynamic_values()
-    data = [
-        # PILLAR 1: Robinhood
-        {'Name': 'AAPL', 'Tkr': 'AAPL', 'Qty': 32.875151, 'Pillar': 'Robinhood'},
-        {'Name': 'AMD', 'Tkr': 'AMD', 'Qty': 17.228305, 'Pillar': 'Robinhood'},
-        {'Name': 'AMZN', 'Tkr': 'AMZN', 'Qty': 6.139473, 'Pillar': 'Robinhood'},
-        {'Name': 'ANET', 'Tkr': 'ANET', 'Qty': 6.970517, 'Pillar': 'Robinhood'},
-        {'Name': 'AVGO', 'Tkr': 'AVGO', 'Qty': 17.692543, 'Pillar': 'Robinhood'},
-        {'Name': 'CRWD', 'Tkr': 'CRWD', 'Qty': 6.730194, 'Pillar': 'Robinhood'},
-        {'Name': 'DELL', 'Tkr': 'DELL', 'Qty': 7.15184, 'Pillar': 'Robinhood'},
-        {'Name': 'DIS', 'Tkr': 'DIS', 'Qty': 14.709586, 'Pillar': 'Robinhood'},
-        {'Name': 'ENPH', 'Tkr': 'ENPH', 'Qty': 10.65757, 'Pillar': 'Robinhood'},
-        {'Name': 'GEV', 'Tkr': 'GEV', 'Qty': 1.207569, 'Pillar': 'Robinhood'},
-        {'Name': 'GLD', 'Tkr': 'GLD', 'Qty': 3.048105, 'Pillar': 'Robinhood'},
-        {'Name': 'GOOGL', 'Tkr': 'GOOGL', 'Qty': 42.149825, 'Pillar': 'Robinhood'},
-        {'Name': 'JPM', 'Tkr': 'JPM', 'Qty': 2.753308, 'Pillar': 'Robinhood'},
-        {'Name': 'META', 'Tkr': 'META', 'Qty': 8.317115, 'Pillar': 'Robinhood'},
-        {'Name': 'MRVL', 'Tkr': 'MRVL', 'Qty': 4.209034, 'Pillar': 'Robinhood'},
-        {'Name': 'MSFT', 'Tkr': 'MSFT', 'Qty': 19.746979, 'Pillar': 'Robinhood'},
-        {'Name': 'NFLX', 'Tkr': 'NFLX', 'Qty': 77.97709, 'Pillar': 'Robinhood'},
-        {'Name': 'NVDA', 'Tkr': 'NVDA', 'Qty': 41.067308, 'Pillar': 'Robinhood'},
-        {'Name': 'PANW', 'Tkr': 'PANW', 'Qty': 2.468968, 'Pillar': 'Robinhood'},
-        {'Name': 'PLTR', 'Tkr': 'PLTR', 'Qty': 18.184741, 'Pillar': 'Robinhood'},
-        {'Name': 'SHOP', 'Tkr': 'SHOP', 'Qty': 42.621966, 'Pillar': 'Robinhood'},
-        {'Name': 'TSLA', 'Tkr': 'TSLA', 'Qty': 16.669082, 'Pillar': 'Robinhood'},
-        {'Name': 'TSM', 'Tkr': 'TSM', 'Qty': 4.457336, 'Pillar': 'Robinhood'},
-        {'Name': 'TTWO', 'Tkr': 'TTWO', 'Qty': 2.719393, 'Pillar': 'Robinhood'},
-        {'Name': 'UBER', 'Tkr': 'UBER', 'Qty': 42.189843, 'Pillar': 'Robinhood'},
-        {'Name': 'VGT', 'Tkr': 'VGT', 'Qty': 88.524888, 'Pillar': 'Robinhood'},
-        {'Name': 'VRT', 'Tkr': 'VRT', 'Qty': 8.559334, 'Pillar': 'Robinhood'},
-        {'Name': 'CRDO', 'Tkr': 'CRDO', 'Qty': 8.3776, 'Pillar': 'Robinhood'},
-        {'Name': 'CRWV', 'Tkr': 'CRWV', 'Qty': 9.0, 'Pillar': 'Robinhood'},
-        {'Name': 'FLEX', 'Tkr': 'FLEX', 'Qty': 10.0, 'Pillar': 'Robinhood'},
-        {'Name': 'HOOD', 'Tkr': 'HOOD', 'Qty': 8.0, 'Pillar': 'Robinhood'},
-        {'Name': 'INOD', 'Tkr': 'INOD', 'Qty': 17.750223, 'Pillar': 'Robinhood'},
-        {'Name': 'LRCX', 'Tkr': 'LRCX', 'Qty': 9.22168, 'Pillar': 'Robinhood'},
-        {'Name': 'MU', 'Tkr': 'MU', 'Qty': 6.94118, 'Pillar': 'Robinhood'},
-        {'Name': 'NBIS', 'Tkr': 'NBIS', 'Qty': 1.0, 'Pillar': 'Robinhood'},
-        {'Name': 'OKLO', 'Tkr': 'OKLO', 'Qty': 1.184033, 'Pillar': 'Robinhood'},
-        {'Name': 'PSI', 'Tkr': 'PSI', 'Qty': 2.491277, 'Pillar': 'Robinhood'},
-        {'Name': 'RDDT', 'Tkr': 'RDDT', 'Qty': 4.992676, 'Pillar': 'Robinhood'},
-        {'Name': 'SNDK', 'Tkr': 'SNDK', 'Qty': 4.347362, 'Pillar': 'Robinhood'},
-        {'Name': 'STX', 'Tkr': 'STX', 'Qty': 4.744995, 'Pillar': 'Robinhood'},
-        {'Name': 'WDC', 'Tkr': 'WDC', 'Qty': 8.910648, 'Pillar': 'Robinhood'},
-        {'Name': 'Bitcoin', 'Tkr': 'BTC-USD', 'Qty': 0.06752957, 'Pillar': 'Robinhood'},
-        
-        # PILLAR 2: ETRADE
-        {'Name': 'VTSAX (ET)', 'Tkr': 'VTSAX', 'Qty': 1080, 'Pillar': 'ETRADE'},
-        {'Name': 'VWUSX (ET)', 'Tkr': 'VWUSX', 'Qty': 82.772, 'Pillar': 'ETRADE'},
-        {'Name': 'VFIAX (ET)', 'Tkr': 'VFIAX', 'Qty': 15.115, 'Pillar': 'ETRADE'},
-        {'Name': 'VTIAX (ET)', 'Tkr': 'VTIAX', 'Qty': 225.887, 'Pillar': 'ETRADE'},
-        
-        # PILLAR 3: Retirement
-        {'Name': 'VTSAX (Roth IRA)', 'Tkr': 'VTSAX', 'Qty': 3318.528, 'Pillar': 'Retirement'},
-        {'Name': 'FELG (Roth IRA)', 'Tkr': 'FELG', 'Qty': 386, 'Pillar': 'Retirement'},
-        {'Name': 'WFSPX (Roth 401k)', 'Tkr': 'WFSPX', 'Qty': 157.092, 'Pillar': 'Retirement'},
-        {'Name': 'JLGMX (Roth 401k)', 'Tkr': 'JLGMX', 'Qty': 641.5629, 'Pillar': 'Retirement'},
-        {'Name': 'Auto 401k Growth', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Retirement', 'Base': auto_401k},
-        
-        # PILLAR 4: College Fund
-        {'Name': 'VTSAX (College)', 'Tkr': 'VTSAX', 'Qty': 209.296, 'Pillar': 'College Fund'},
-        {'Name': 'VTI (College)', 'Tkr': 'VTI', 'Qty': 222.203, 'Pillar': 'College Fund'},
-        
-        # PILLAR 5: Non-US/India & HSA
-        {'Name': 'India Assets', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Non-US/India', 'Base': 300000},
-        {'Name': 'HSA (VTSAX)', 'Tkr': 'VTSAX', 'Qty': (hsa_p / 118), 'Pillar': 'Non-US/India'},
+# --- CONFIGURATION ---
+RET_AGE = 50
+CUR_AGE = 43
+YEARS_TO_GO = RET_AGE - CUR_AGE
+SWR = 0.035
 
-        # PILLAR 6: Cash
-        {'Name': 'HYSA Savings', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Cash', 'Base': 40000},
-        
-        # SYSTEM
-        {'Name': 'Roswell Home', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Real Estate', 'Base': h_val},
-        {'Name': 'Mortgage Debt', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Liability', 'Base': -m_bal}
-    ]
-    df = pd.DataFrame(data)
-    tkrs = df[df['Tkr'] != 'FIXED']['Tkr'].unique().tolist()
-    try:
-        p_df = yf.download(tkrs, period="7d", group_by='ticker', progress=False)
-        def get_v(r):
-            if r['Tkr'] == 'FIXED': return r['Base'], r['Base']
-            valid = p_df[r['Tkr']]['Close'].dropna()
-            return valid.iloc[-1] * r['Qty'], valid.iloc[-2] * r['Qty']
-        df[['Curr', 'Prev']] = df.apply(lambda x: pd.Series(get_v(x)), axis=1)
-    except:
-        df['Curr'] = df.get('Base', 0); df['Prev'] = df['Curr']
-    
-    df['Chg_$'] = (df['Curr'] - df['Prev']).fillna(0)
-    df['Chg_%'] = ((df['Curr'] / df['Prev'] - 1) * 100).fillna(0)
-    return df
+# --- ENGINE ---
+def project_wealth(base, rate, monthly_contrib):
+    months = YEARS_TO_GO * 12
+    m_rate = (1 + rate)**(1/12) - 1
+    balances = [base]
+    for _ in range(months):
+        balances.append((balances[-1] * (1 + m_rate)) + monthly_contrib)
+    return balances
 
-df = load_all_pillars()
+# Current Liquid Total (RH + ET + India + Cash + HSA)
+# Based on your ledger, we'll anchor at ~$1,065,000
+current_liquid = 1065000 
+monthly_contrib = 3600 # 401k + HSA + Match
 
-# --- CALCULATIONS ---
-nw_curr = df['Curr'].sum()
-nw_prev = df['Prev'].sum()
-nw_chg_dollar = nw_curr - nw_prev
-nw_chg_pct = (nw_chg_dollar / nw_prev) * 100
+projection = project_wealth(current_liquid, display_rate, monthly_contrib)
+final_val = projection[-1]
+monthly_income = (final_val * SWR) / 12
 
-fire_cur = df[df['Pillar'].isin(['Robinhood', 'ETRADE', 'Non-US/India', 'Cash'])]['Curr'].sum()
-fire_pct = min(fire_cur / FIRE_TARGET, 1.0)
-nw_goal_pct = min(nw_curr / NW_TARGET, 1.0)
-
-# --- DASHBOARD UI ---
-st.title("🛡️ FIRE PULSE V2")
-st.caption("Strategic Wealth Control • Obsidian Edition")
+# --- UI ---
+st.title("🛡️ THE VASIREDDY FORTRESS: 2035 PREDICTOR")
+st.caption(f"Currently Viewing: {mode_label} | Target Age: {RET_AGE}")
 
 m1, m2, m3 = st.columns(3)
-m1.metric("NET WORTH", f"${nw_curr:,.0f}", delta=f"${nw_chg_dollar:,.2f} ({nw_chg_pct:.2f}%)")
-m2.metric("LIQUID FIRE", f"${fire_cur:,.0f}")
-m3.metric("GAP TO $2.5M", f"${max(0, NW_TARGET - nw_curr):,.0f}")
+m1.metric(f"PROJECTED ASSETS ({2035})", f"${final_val:,.0f}")
+m2.metric("MONTHLY RETIREMENT SALARY", f"${monthly_income:,.0f}")
+m3.metric("SAFE WITHDRAWAL RATE", f"{SWR*100:.1%}")
 
 st.divider()
 
-p_col1, p_col2 = st.columns(2)
-with p_col1:
-    st.subheader(f"FIRE TARGET ($1M) • {fire_pct:.1%}")
-    st.progress(fire_pct)
-with p_col2:
-    st.subheader(f"NET WORTH TARGET ($2.5M) • {nw_goal_pct:.1%}")
-    st.progress(nw_goal_pct)
+# CHART
+st.subheader(f"Growth Curve to Age 50 ({mode_label})")
+fig = go.Figure()
+fig.add_trace(go.Scatter(y=projection, mode='lines', fill='tozeroy', 
+                         line=dict(color='#00E676', width=4), name="Wealth Path"))
+fig.add_hline(y=2500000, line_dash="dot", line_color="orange", annotation_text="Net Worth Goal")
+fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color="white"),
+                  xaxis_title="Months from May 2026", yaxis_title="Liquid Assets ($)")
+st.plotly_chart(fig, use_container_width=True)
 
 st.divider()
 
-# Charts
-c_left, c_right = st.columns([1.5, 1])
-with c_left:
-    st.subheader("PILLAR ALLOCATION")
-    fig_pie = px.pie(df[df['Curr'] > 0], values='Curr', names='Pillar', hole=0.6, 
-                     color_discrete_sequence=px.colors.sequential.Tealgrn)
-    fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', font=dict(color="#B0B0B0"), showlegend=True)
-    st.plotly_chart(fig_pie, use_container_width=True)
+# ANALYTICS SECTION
+st.subheader("Strategy Insights")
+c1, c2 = st.columns(2)
 
-with c_right:
-    st.subheader("COMPONENT SUMMARY")
-    p_sum = df.groupby('Pillar')['Curr'].sum()
-    for p in ['Robinhood', 'ETRADE', 'Retirement', 'College Fund', 'Non-US/India', 'Cash', 'Real Estate']:
-        val = p_sum.get(p, 0)
-        st.markdown(f"**{p}** <span style='float:right; color:#00E676;'>${val:,.0f}</span>", unsafe_allow_html=True)
-        st.progress(min(val/1000000, 1.0))
+with c1:
+    st.info("**What this means:**")
+    if adjust_inflation:
+        st.write(f"In 2035, your portfolio will have the buying power of **${final_val:,.0f}** in today's money. This is the 'true' weight of your wealth.")
+    else:
+        st.write(f"Your bank account will show **${final_val:,.0f}**. This is the number you will actually see on your screen in 2035.")
 
-st.divider()
-
-# Top 10 RH
-rh_df = df[df['Pillar'] == 'Robinhood'].copy()
-rh_total = rh_df['Curr'].sum()
-rh_df['Port_%'] = (rh_df['Curr'] / rh_total) * 100
-top_10 = rh_df.sort_values('Curr', ascending=False).head(10)
-
-st.subheader("ROBINHOOD TOP 10 CONCENTRATION")
-fig_rh = px.bar(top_10, x='Name', y='Curr', text_auto='.2s', color='Curr', 
-                color_continuous_scale='tealgrn', hover_data={'Port_%': ':.2f%'})
-fig_rh.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color="#B0B0B0"), coloraxis_showscale=False)
-st.plotly_chart(fig_rh, use_container_width=True)
-
-st.divider()
-
-# Ledger
-st.subheader("MASTER ASSET LEDGER")
-def style_ledger(val):
-    if isinstance(val, (int, float)):
-        if val > 0: return 'color: #00E676'
-        if val < 0: return 'color: #FF5252'
-    return 'color: #E0E0E0'
-
-st.dataframe(
-    df[['Pillar', 'Name', 'Curr', 'Chg_$', 'Chg_%']]
-    .sort_values(['Pillar', 'Curr'], ascending=False)
-    .style.format({'Curr': '${:,.2f}', 'Chg_$': '${:,.2f}', 'Chg_%': '{:,.2f}%'})
-    .map(style_ledger, subset=['Chg_$', 'Chg_%']),
-    use_container_width=True, hide_index=True
-)
+with c2:
+    st.write("**Fortress Stability Check**")
+    # Simple check: Does monthly income cover a projected $6k/mo lifestyle?
+    if monthly_income > 6000:
+        st.success("✅ Your 2035 Runway exceeds the $6k/mo lifestyle benchmark.")
+    else:
+        st.warning("⚠️ Runway is tight against the $6k/mo benchmark. Consider increasing savings or yield.")
