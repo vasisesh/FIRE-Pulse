@@ -15,7 +15,6 @@ st.markdown("""
     [data-testid="stMetricLabel"] { color: #4b5563 !important; font-weight: 600 !important; }
     [data-testid="stMetricValue"] { color: #111827 !important; font-weight: 800 !important; }
     .main { background-color: #0e1117; }
-    /* FIRE Progress Bar Color */
     .stProgress > div > div > div > div { background-image: linear-gradient(to right, #008080 , #00ffcc); }
     </style>
     """, unsafe_allow_html=True)
@@ -23,7 +22,6 @@ st.markdown("""
 # --- CONSTANTS ---
 FIRE_TARGET = 1000000
 COLLEGE_TARGET = 125000
-COLLEGE_TARGET_YEAR = 2030
 
 # --- ENGINES ---
 def calculate_real_estate():
@@ -34,12 +32,10 @@ def calculate_real_estate():
     delta = relativedelta(now, start_date)
     months_passed = delta.years * 12 + delta.months
     
-    # Mortgage Balance (2.99%, 15yr)
     r, n = 0.0299 / 12, 15 * 12
     m_pay = mortgage_start * (r * (1 + r)**n) / ((1 + r)**n - 1)
     balance = mortgage_start * (1 + r)**months_passed - (m_pay / r) * ((1 + r)**months_passed - 1)
     
-    # Appreciation (2.5% Annual)
     growth_rate = (1 + 0.025)**(1/12) - 1
     current_house_val = purchase_price * (1 + growth_rate)**months_passed
     
@@ -98,10 +94,11 @@ def load_all_pillars():
         {'Name': 'S&P 500 Index', 'Tkr': 'VFIAX', 'Qty': 15.115, 'Pillar': 'ETRADE'},
         {'Name': 'International Stock', 'Tkr': 'VTIAX', 'Qty': 225.887, 'Pillar': 'ETRADE'},
         
-        # PILLAR 3: Retirement (Placeholder)
-        {'Name': 'Retirement Balances', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Retirement', 'Base_Val': 0},
+        # PILLAR 3: Retirement
+        {'Name': 'VTSAX (Roth IRA)', 'Tkr': 'VTSAX', 'Qty': 3318.528, 'Pillar': 'Retirement'},
+        {'Name': 'FELG (Roth IRA)', 'Tkr': 'FELG', 'Qty': 386, 'Pillar': 'Retirement'},
         
-        # PILLAR 4: College Fund (Live Holdings)
+        # PILLAR 4: College Fund (Vikram 529)
         {'Name': 'VTSAX (College)', 'Tkr': 'VTSAX', 'Qty': 209.296, 'Pillar': 'College Fund'},
         {'Name': 'VTI (College)', 'Tkr': 'VTI', 'Qty': 222.203, 'Pillar': 'College Fund'},
         
@@ -115,11 +112,16 @@ def load_all_pillars():
     df = pd.DataFrame(data)
     tkrs = df[df['Tkr'] != 'FIXED']['Tkr'].unique().tolist()
     try:
+        # Pushing to 7 days for maximum lookback reliability
         p_df = yf.download(tkrs, period="7d", group_by='ticker', progress=False)
         def get_v(r):
             if r['Tkr'] == 'FIXED': return r['Base_Val'], r['Base_Val']
-            valid = p_df[r['Tkr']]['Close'].dropna()
-            return valid.iloc[-1] * r['Qty'], valid.iloc[-2] * r['Qty']
+            try:
+                # Skips empty values (weekends) and takes the last valid business closes
+                valid = p_df[r['Tkr']]['Close'].dropna()
+                return valid.iloc[-1] * r['Qty'], valid.iloc[-2] * r['Qty']
+            except:
+                return 0, 0
         df[['Curr_Val', 'Prev_Val']] = df.apply(lambda x: pd.Series(get_v(x)), axis=1)
     except:
         df['Curr_Val'] = df.get('Base_Val', 0)
@@ -132,50 +134,45 @@ df = load_all_pillars()
 # --- CALCULATIONS ---
 nw = df['Curr_Val'].sum()
 day_p = df['Day_Chg'].sum()
-
 fire_current = df[df['Pillar'].isin(['Robinhood', 'ETRADE', 'Non-US/India'])]['Curr_Val'].sum()
 fire_pct = min(fire_current / FIRE_TARGET, 1.0)
-
-college_current = df[df['Pillar'] == 'College Fund']['Curr_Val'].sum()
-college_pct = min(college_current / COLLEGE_TARGET, 1.0)
+ret_val = df[df['Pillar'] == 'Retirement']['Curr_Val'].sum()
+col_val = df[df['Pillar'] == 'College Fund']['Curr_Val'].sum()
 
 # --- DASHBOARD ---
 st.title("🔥 FIRE Pulse: Roadmap to Milestones")
 
-col1, col2, col3 = st.columns(3)
-col1.metric("Total Net Worth", f"${nw:,.0f}", delta=f"${day_p:,.2f} Today")
-col2.metric("FIRE Asset Value", f"${fire_current:,.0f}")
-col3.metric("College Asset Value", f"${college_current:,.0f}")
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Total Net Worth", f"${nw:,.0f}", delta=f"${day_p:,.2f} (Latest)")
+col2.metric("FIRE Pillars", f"${fire_current:,.0f}")
+col3.metric("Retirement Assets", f"${ret_val:,.0f}")
+col4.metric("College Fund", f"${col_val:,.0f}")
 
 st.divider()
 
-# PROGRESS TRACKERS
-left_prog, right_prog = st.columns(2)
-with left_prog:
-    st.subheader(f"FIRE Goal Progress ($1M): {fire_pct:.1%}")
-    st.progress(fire_pct)
-with right_prog:
-    st.subheader(f"College Goal Progress ($125k): {college_pct:.1%}")
-    st.progress(college_pct)
+# Progress Tracker
+st.subheader(f"FIRE Asset Progress ($1M): {fire_pct:.1%}")
+st.progress(fire_pct)
+st.caption("Milestone: Robinhood + E*TRADE + India Assets")
 
 st.divider()
 
-c_left, c_right = st.columns([1.5, 1])
-with c_left:
-    st.subheader("Pillar Distribution")
+c1, c2 = st.columns([1.5, 1])
+with c1:
+    st.subheader("Asset Distribution")
     pie_df = df[df['Curr_Val'] > 0].groupby('Pillar')['Curr_Val'].sum().reset_index()
     fig = px.pie(pie_df, values='Curr_Val', names='Pillar', hole=0.5, color_discrete_sequence=px.colors.sequential.Teal)
     fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"))
     st.plotly_chart(fig, use_container_width=True)
 
-with c_right:
-    st.subheader("Component Summary")
-    for p in ['Robinhood', 'ETRADE', 'College Fund', 'Non-US/India']:
+with c2:
+    st.subheader("Pillar Summary")
+    for p in ['Robinhood', 'ETRADE', 'Retirement', 'College Fund', 'Non-US/India']:
         val = df[df['Pillar'] == p]['Curr_Val'].sum()
         st.write(f"**{p}**: ${val:,.0f}")
 
 st.divider()
-st.subheader("Master Asset Ledger")
+st.subheader("Asset Ledger")
 st.dataframe(df[['Pillar', 'Name', 'Curr_Val', 'Day_Chg']].sort_values(['Pillar', 'Curr_Val'], ascending=False).style.format({
     'Curr_Val': '${:,.2f}', 'Day_Chg': '${:,.2f}'
 }), use_container_width=True, hide_index=True)
