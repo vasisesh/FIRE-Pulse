@@ -15,7 +15,6 @@ st.markdown("""
     [data-testid="stMetricLabel"] { color: #4b5563 !important; font-weight: 600 !important; }
     [data-testid="stMetricValue"] { color: #111827 !important; font-weight: 800 !important; }
     .main { background-color: #0e1117; }
-    /* FIRE Progress Bar (Teal) */
     .stProgress > div > div > div > div { background-image: linear-gradient(to right, #008080 , #00ffcc); }
     </style>
     """, unsafe_allow_html=True)
@@ -27,8 +26,6 @@ NW_TARGET = 2500000
 # --- ENGINES ---
 def calculate_dynamic_values():
     now = datetime.now()
-    
-    # 1. Home Equity (Roswell, GA)
     h_start = datetime(2022, 4, 1)
     h_delta = relativedelta(now, h_start)
     h_months = h_delta.years * 12 + h_delta.months
@@ -36,18 +33,14 @@ def calculate_dynamic_values():
     m_pay = 480000 * (r_h * (1 + r_h)**n_h) / ((1 + r_h)**n_h - 1)
     m_bal = 480000 * (r_h + 1)**h_months - (m_pay / r_h) * ((r_h + 1)**h_months - 1)
     h_val = 600000 * (1 + (1.025**(1/12)-1))**h_months
-    
-    # 2. 401k Contribution Engine
     c_start = datetime(2026, 1, 1)
     days_passed = (now - c_start).days
     biweekly_periods = max(0, days_passed // 14)
     total_contributions = biweekly_periods * 1269.23
-    
     return h_val, m_bal, total_contributions
 
 def load_all_pillars():
     h_val, m_bal, auto_401k = calculate_dynamic_values()
-    
     data = [
         # PILLAR 1: Robinhood
         {'Name': 'AAPL', 'Tkr': 'AAPL', 'Qty': 32.875151, 'Pillar': 'Robinhood'},
@@ -113,7 +106,7 @@ def load_all_pillars():
         # PILLAR 5: Non-US/India
         {'Name': 'India Assets', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Non-US/India', 'Base': 300000},
 
-        # CASH
+        # PILLAR 6: Cash
         {'Name': 'HYSA Savings', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Cash', 'Base': 40000},
         
         # SYSTEM
@@ -132,21 +125,23 @@ def load_all_pillars():
     except:
         df['Curr'] = df.get('Base', 0)
         df['Prev'] = df['Curr']
-    df['Chg'] = (df['Curr'] - df['Prev']).fillna(0)
+    
+    df['Chg_$'] = (df['Curr'] - df['Prev']).fillna(0)
+    # NEW: Calculate % Change
+    df['Chg_%'] = ((df['Curr'] / df['Prev'] - 1) * 100).fillna(0)
     return df
 
 df = load_all_pillars()
 
 # --- CALCULATIONS ---
 nw = df['Curr'].sum()
-day_p = df['Chg'].sum()
+day_p = df['Chg_$'].sum()
 fire_cur = df[df['Pillar'].isin(['Robinhood', 'ETRADE', 'Non-US/India', 'Cash'])]['Curr'].sum()
-
 fire_pct = min(fire_cur / FIRE_TARGET, 1.0)
 nw_pct = min(nw / NW_TARGET, 1.0)
 
 # --- DASHBOARD ---
-st.title("🔥 FIRE Pulse: The Road to Freedom")
+st.title("🔥 FIRE Pulse")
 
 col1, col2, col3 = st.columns(3)
 col1.metric("Total Net Worth", f"${nw:,.0f}", delta=f"${day_p:,.2f}")
@@ -155,17 +150,13 @@ col3.metric("Gap to $2.5M", f"${max(0, NW_TARGET - nw):,.0f}")
 
 st.divider()
 
-# MILESTONE TRACKERS
 c1, c2 = st.columns(2)
 with c1:
     st.subheader(f"FIRE Goal ($1M): {fire_pct:.1%}")
     st.progress(fire_pct)
-    st.caption("Liquid: RH + ET + India + Cash")
-
 with c2:
     st.subheader(f"Net Worth Goal ($2.5M): {nw_pct:.1%}")
     st.progress(nw_pct)
-    st.caption("Full Portfolio: Pillars + Real Estate")
 
 st.divider()
 
@@ -177,11 +168,28 @@ with charts_left:
     fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"))
     st.plotly_chart(fig, use_container_width=True)
 with summary_right:
-    st.subheader("Pillar Breakdown")
+    st.subheader("Pillar Summary")
     for p in ['Robinhood', 'ETRADE', 'Retirement', 'College Fund', 'Non-US/India', 'Cash', 'Real Estate']:
         val = df[df['Pillar'] == p]['Curr'].sum()
         st.write(f"**{p}**: ${val:,.0f}")
 
 st.divider()
-st.subheader("Full Ledger")
-st.dataframe(df[['Pillar', 'Name', 'Curr', 'Chg']].sort_values(['Pillar', 'Curr'], ascending=False).style.format({'Curr': '${:,.2f}', 'Chg': '${:,.2f}'}), use_container_width=True, hide_index=True)
+st.subheader("Full Ledger (Daily Movement)")
+
+# NEW: Formatting the Ledger with % Change and Color Coding
+def color_change(val):
+    color = '#28a745' if val > 0 else '#dc3545' if val < 0 else 'white'
+    return f'color: {color}'
+
+st.dataframe(
+    df[['Pillar', 'Name', 'Curr', 'Chg_$', 'Chg_%']]
+    .sort_values(['Pillar', 'Curr'], ascending=False)
+    .style.format({
+        'Curr': '${:,.2f}', 
+        'Chg_$': '${:,.2f}', 
+        'Chg_%': '{:,.2f}%'
+    })
+    .applymap(color_change, subset=['Chg_$', 'Chg_%']), 
+    use_container_width=True, 
+    hide_index=True
+)
