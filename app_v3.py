@@ -34,7 +34,7 @@ NW_TARGET = 2500000
 # --- 3. DYNAMIC VALUE ENGINES ---
 def calculate_dynamic_values():
     now = datetime.now()
-    # Home Equity logic
+    # Home Equity logic (Roswell GA baseline)
     h_start = datetime(2022, 4, 1)
     h_months = (relativedelta(now, h_start).years * 12) + relativedelta(now, h_start).months
     r_h, n_h = 0.0299 / 12, 15 * 12
@@ -50,26 +50,26 @@ def calculate_dynamic_values():
 def load_all_data():
     h_val, m_bal, auto_401k, hsa_p = calculate_dynamic_values()
     data = [
-        # PILLAR 1: Robinhood
-        {'Name': 'AAPL', 'Tkr': 'AAPL', 'Qty': 32.875, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'AMD', 'Tkr': 'AMD', 'Qty': 17.228, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'AMZN', 'Tkr': 'AMZN', 'Qty': 6.139, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'ANET', 'Tkr': 'ANET', 'Qty': 6.970, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'AVGO', 'Tkr': 'AVGO', 'Qty': 17.692, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'CRWD', 'Tkr': 'CRWD', 'Qty': 6.730, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'DELL', 'Tkr': 'DELL', 'Qty': 7.151, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'DIS', 'Tkr': 'DIS', 'Qty': 14.709, 'Pillar': 'Robinhood', 'Risk': 'Mid'},
-        {'Name': 'ENPH', 'Tkr': 'ENPH', 'Qty': 10.657, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'GOOGL', 'Tkr': 'GOOGL', 'Qty': 42.149, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'META', 'Tkr': 'META', 'Qty': 8.317, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'MSFT', 'Tkr': 'MSFT', 'Qty': 19.746, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'NFLX', 'Tkr': 'NFLX', 'Qty': 77.977, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'NVDA', 'Tkr': 'NVDA', 'Qty': 41.067, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'PLTR', 'Tkr': 'PLTR', 'Qty': 18.184, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'SHOP', 'Tkr': 'SHOP', 'Qty': 42.621, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'TSLA', 'Tkr': 'TSLA', 'Qty': 16.669, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'VGT', 'Tkr': 'VGT', 'Qty': 88.524, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'Bitcoin', 'Tkr': 'BTC-USD', 'Qty': 0.067, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        # PILLAR 1: Robinhood (Full Asset Sync)
+        {'Name': 'AAPL', 'Tkr': 'AAPL', 'Qty': 32.875151, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'AMD', 'Tkr': 'AMD', 'Qty': 17.228305, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'AMZN', 'Tkr': 'AMZN', 'Qty': 6.139473, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'ANET', 'Tkr': 'ANET', 'Qty': 6.970517, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'AVGO', 'Tkr': 'AVGO', 'Qty': 17.692543, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'CRWD', 'Tkr': 'CRWD', 'Qty': 6.730194, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'DELL', 'Tkr': 'DELL', 'Qty': 7.15184, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'DIS', 'Tkr': 'DIS', 'Qty': 14.709586, 'Pillar': 'Robinhood', 'Risk': 'Mid'},
+        {'Name': 'ENPH', 'Tkr': 'ENPH', 'Qty': 10.65757, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'GOOGL', 'Tkr': 'GOOGL', 'Qty': 42.149825, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'META', 'Tkr': 'META', 'Qty': 8.317115, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'MSFT', 'Tkr': 'MSFT', 'Qty': 19.746979, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'NFLX', 'Tkr': 'NFLX', 'Qty': 77.97709, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'NVDA', 'Tkr': 'NVDA', 'Qty': 41.067308, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'PLTR', 'Tkr': 'PLTR', 'Qty': 18.184741, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'SHOP', 'Tkr': 'SHOP', 'Qty': 42.621966, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'TSLA', 'Tkr': 'TSLA', 'Qty': 16.669082, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'VGT', 'Tkr': 'VGT', 'Qty': 88.524888, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'Bitcoin', 'Tkr': 'BTC-USD', 'Qty': 0.06752957, 'Pillar': 'Robinhood', 'Risk': 'High'},
         
         # PILLAR 2: ETRADE
         {'Name': 'VTSAX (ET)', 'Tkr': 'VTSAX', 'Qty': 1080, 'Pillar': 'ETRADE', 'Risk': 'Mid'},
@@ -82,7 +82,7 @@ def load_all_data():
         {'Name': 'FELG (Roth IRA)', 'Tkr': 'FELG', 'Qty': 386, 'Pillar': 'Retirement', 'Risk': 'High'},
         {'Name': 'WFSPX (Roth 401k)', 'Tkr': 'WFSPX', 'Qty': 157.092, 'Pillar': 'Retirement', 'Risk': 'Mid'},
         {'Name': 'JLGMX (Roth 401k)', 'Tkr': 'JLGMX', 'Qty': 641.562, 'Pillar': 'Retirement', 'Risk': 'High'},
-        {'Name': 'Auto 401k Contribution', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Retirement', 'Base': auto_401k, 'Risk': 'Mid'},
+        {'Name': 'Auto 401k Growth', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Retirement', 'Base': auto_401k, 'Risk': 'Mid'},
         
         # PILLAR 4: College Fund
         {'Name': 'VTSAX (College)', 'Tkr': 'VTSAX', 'Qty': 209.296, 'Pillar': 'College Fund', 'Risk': 'Mid'},
@@ -128,7 +128,7 @@ nw_progress = min(nw_curr / NW_TARGET, 1.0)
 
 # --- 5. UI DASHBOARD ---
 st.title("🛡️ THE VASIREDDY FORTRESS V3")
-st.caption("Active Mission Tracker • 100% Asset Sync")
+st.caption("Strategic Risk & Mission Tracker • Obsidian Edition")
 
 m1, m2, m3 = st.columns(3)
 m1.metric("TOTAL NET WORTH", f"${nw_curr:,.0f}", delta=f"${df['Chg_$'].sum():,.2f}")
@@ -137,25 +137,41 @@ m3.metric("TECH CONCENTRATION", f"{risk_score:.1f}%")
 
 st.divider()
 
-# --- RISK GAUGE & STRATEGY ---
-g_col, t_col = st.columns([1, 1])
+# --- IMPROVED RISK GAUGE & MISSION ---
+g_col, m_col = st.columns([1, 1])
+
 with g_col:
-    st.subheader("PORTFOLIO RISK CLIMATE")
-    fig_gauge = go.Figure(go.Indicator(mode = "gauge+number", value = risk_score,
-        gauge = {'bar':{'color': "#00E676"}, 'steps': [{'range': [0, 40], 'color': '#1565C0'}, {'range': [40, 75], 'color': '#FF8F00'}, {'range': [75, 100], 'color': '#C62828'}]}))
-    fig_gauge.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, height=280)
+    st.subheader("RISK TEMPERATURE")
+    fig_gauge = go.Figure(go.Indicator(
+        mode = "gauge+number",
+        value = risk_score,
+        gauge = {
+            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+            'bar': {'color': "#00E676"},
+            'bgcolor': "rgba(0,0,0,0)",
+            'steps': [
+                {'range': [0, 40], 'color': 'rgba(21, 101, 192, 0.3)'},  # Blue: Defensive
+                {'range': [40, 75], 'color': 'rgba(255, 143, 0, 0.3)'}, # Amber: Growth
+                {'range': [75, 100], 'color': 'rgba(198, 40, 40, 0.3)'} # Red: Aggressive
+            ],
+            'threshold': {'line': {'color': "white", 'width': 4}, 'thickness': 0.75, 'value': risk_score}
+        }
+    ))
+    fig_gauge.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={'color': "white", 'family': "JetBrains Mono"}, height=280)
     st.plotly_chart(fig_gauge, use_container_width=True)
-with t_col:
+
+with m_col:
     st.subheader("CORE MISSION PROGRESS")
     st.write(f"**FIRE Goal ($1.0M Liquid):** {fire_progress:.1%}")
     st.progress(fire_progress)
     st.write("")
     st.write(f"**Net Worth Goal ($2.5M Total):** {nw_progress:.1%}")
     st.progress(nw_progress)
+    st.info(f"Liquid assets are currently **${liquid_total:,.0f}**. You are **${max(0, FIRE_TARGET - liquid_total):,.0f}** away from the FIRE baseline.")
 
 st.divider()
 
-# --- PILLAR PROGRESS ---
+# --- PILLAR PROGRESS & ALLOCATION ---
 c1, c2 = st.columns([1, 1])
 with c1:
     st.subheader("Asset Distribution")
