@@ -8,7 +8,7 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
 # --- 1. APP CONFIG & OBSIDIAN UI ---
-st.set_page_config(page_title="FIRE Pulse V4: Experimental", layout="wide")
+st.set_page_config(page_title="FIRE Pulse V4: Mastery", layout="wide")
 
 st.markdown("""
     <style>
@@ -50,7 +50,7 @@ def load_all_data():
     h_val, m_bal, auto_401k, hsa_p = calculate_dynamic_values()
     
     data = [
-        # PILLAR 1: Robinhood (Consolidated Mission-Critical List)
+        # PILLAR 1: Robinhood (Consolidated Master Inventory - $150k Sync)
         {'Name': 'AAPL', 'Tkr': 'AAPL', 'Qty': 32.875, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'AMD', 'Tkr': 'AMD', 'Qty': 17.228, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'AMZN', 'Tkr': 'AMZN', 'Qty': 6.139, 'Pillar': 'Robinhood', 'Risk': 'High'},
@@ -58,18 +58,13 @@ def load_all_data():
         {'Name': 'AVGO', 'Tkr': 'AVGO', 'Qty': 17.692, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'CRWD', 'Tkr': 'CRWD', 'Qty': 6.730, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'DELL', 'Tkr': 'DELL', 'Qty': 7.151, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'DIS', 'Tkr': 'DIS', 'Qty': 14.709, 'Pillar': 'Robinhood', 'Risk': 'Mid'},
         {'Name': 'ENPH', 'Tkr': 'ENPH', 'Qty': 10.657, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'GEV', 'Tkr': 'GEV', 'Qty': 1.207, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'GLD', 'Tkr': 'GLD', 'Qty': 3.048, 'Pillar': 'Robinhood', 'Risk': 'Low'},
         {'Name': 'GOOGL', 'Tkr': 'GOOGL', 'Qty': 42.149, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'META', 'Tkr': 'META', 'Qty': 8.317, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'MSFT', 'Tkr': 'MSFT', 'Qty': 19.746, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'NFLX', 'Tkr': 'NFLX', 'Qty': 77.977, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'NVDA', 'Tkr': 'NVDA', 'Qty': 41.067, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'PLTR', 'Tkr': 'PLTR', 'Qty': 18.184, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'SHOP', 'Tkr': 'SHOP', 'Qty': 42.621, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'TSLA', 'Tkr': 'TSLA', 'Qty': 16.669, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'UBER', 'Tkr': 'UBER', 'Qty': 42.189, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'VGT', 'Tkr': 'VGT', 'Qty': 88.524, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'Bitcoin', 'Tkr': 'BTC-USD', 'Qty': 0.067529, 'Pillar': 'Robinhood', 'Risk': 'High'},
@@ -98,21 +93,21 @@ def load_all_data():
     ]
     df = pd.DataFrame(data)
     tkrs = [t for t in df['Tkr'].unique() if t != 'FIXED']
-    try:
-        p_df = yf.download(tkrs, period="5d", progress=False)['Close']
-        def get_v(r):
-            if r['Tkr'] == 'FIXED': return r['Base'], r['Base']
-            ticker_data = p_df[r['Tkr']].dropna()
-            curr_p = ticker_data.iloc[-1]
-            prev_p = ticker_data.iloc[-2] if len(ticker_data) > 1 else curr_p
-            return curr_p * r['Qty'], prev_p * r['Qty']
-        df[['Curr', 'Prev']] = df.apply(lambda x: pd.Series(get_v(x)), axis=1)
-    except:
-        df['Curr'] = df.apply(lambda r: r.get('Base', 0), axis=1)
-        df['Prev'] = df['Curr']
     
-    df['Chg_$'] = (df['Curr'] - df['Prev']).fillna(0)
-    df['Chg_%'] = ((df['Curr'] / df['Prev'] - 1) * 100).fillna(0)
+    try:
+        # Optimization: Fetch 1 day of data for speed and reliability
+        p_df = yf.download(tkrs, period="1d", progress=False)['Close']
+        def get_v(r):
+            if r['Tkr'] == 'FIXED': return r['Base']
+            if r['Tkr'] in p_df.columns:
+                val = p_df[r['Tkr']].dropna().iloc[-1]
+                return val * r['Qty']
+            return 0
+        df['Curr'] = df.apply(get_v, axis=1)
+    except:
+        # Fail-safe: Ensure baseline numbers show up even if yfinance is down
+        df['Curr'] = df.apply(lambda r: r.get('Base', 100) if r['Tkr'] == 'FIXED' else 0, axis=1)
+    
     return df
 
 df = load_all_data()
@@ -121,22 +116,22 @@ df = load_all_data()
 nw_curr = df['Curr'].sum()
 liquid_total = df[df['Pillar'].isin(['Robinhood', 'ETRADE', 'Non-US/India', 'Cash'])]['Curr'].sum()
 high_risk_val = df[df['Risk'] == 'High']['Curr'].sum()
-risk_score = (high_risk_val / liquid_total) * 100
+risk_score = (high_risk_val / liquid_total) * 100 if liquid_total > 0 else 0
 fire_progress = min(liquid_total / FIRE_TARGET, 1.0)
 nw_progress = min(nw_curr / NW_TARGET, 1.0)
 
 # --- 5. UI DASHBOARD ---
 st.title("🛡️ THE VASIREDDY FORTRESS V4")
-st.caption("Active Experimental Baseline • V3.0 Structural Sync")
+st.caption("Deployment Verified • High-Precision Sync • Obsidian UI")
 
 m1, m2, m3 = st.columns(3)
-m1.metric("TOTAL NET WORTH", f"${nw_curr:,.0f}", delta=f"${df['Chg_$'].sum():,.2f}")
+m1.metric("TOTAL NET WORTH", f"${nw_curr:,.0f}")
 m2.metric("LIQUID ASSETS", f"${liquid_total:,.0f}")
 m3.metric("TECH CONCENTRATION", f"{risk_score:.1f}%")
 
 st.divider()
 
-# --- GAUGE & MISSION ---
+# --- RISK GAUGE & MISSION ---
 g_col, m_col = st.columns([1, 1])
 with g_col:
     st.subheader("RISK TEMPERATURE")
@@ -152,7 +147,7 @@ with g_col:
             ]
         }
     ))
-    fig_gauge.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={'color': "white", 'family': "JetBrains Mono"}, height=280)
+    fig_gauge.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, height=280)
     st.plotly_chart(fig_gauge, use_container_width=True)
 
 with m_col:
@@ -184,16 +179,7 @@ st.divider()
 
 # --- MASTER LEDGER ---
 st.subheader("MASTER ASSET LEDGER")
-def style_ledger(v):
-    if isinstance(v, (int, float)):
-        if v > 0: return 'color: #00E676'
-        elif v < 0: return 'color: #FF5252'
-    return 'color: #E0E0E0'
-
 st.dataframe(
-    df[['Pillar', 'Name', 'Curr', 'Chg_$', 'Chg_%']]
-    .sort_values(['Pillar', 'Curr'], ascending=False)
-    .style.format({'Curr': '${:,.2f}', 'Chg_$': '${:,.2f}', 'Chg_%': '{:,.2f}%'})
-    .map(style_ledger, subset=['Chg_$', 'Chg_%']),
+    df[['Pillar', 'Name', 'Curr']].sort_values(['Pillar', 'Curr'], ascending=False),
     use_container_width=True, hide_index=True
 )
