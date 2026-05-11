@@ -21,13 +21,12 @@ st.markdown("""
 
 # --- CONSTANTS ---
 FIRE_TARGET = 1000000
-COLLEGE_TARGET = 125000
 
 # --- ENGINES ---
 def calculate_dynamic_values():
     now = datetime.now()
     
-    # 1. Home Equity
+    # 1. Home Equity (Roswell, GA)
     h_start = datetime(2022, 4, 1)
     h_delta = relativedelta(now, h_start)
     h_months = h_delta.years * 12 + h_delta.months
@@ -37,14 +36,10 @@ def calculate_dynamic_values():
     h_val = 600000 * (1 + (1.025**(1/12)-1))**h_months
     
     # 2. 401k Contribution Engine (Starts Jan 2026)
-    # Annual: $23,000 (Max) + $10,000 (5% of $200k Match) = $33,000
-    # Bi-weekly: $33,000 / 26 = $1,269.23
     c_start = datetime(2026, 1, 1)
-    c_delta = relativedelta(now, c_start)
-    # Approx bi-weekly periods passed
     days_passed = (now - c_start).days
-    biweekly_periods = days_passed // 14
-    total_contributions = biweekly_periods * 1269.23
+    biweekly_periods = max(0, days_passed // 14)
+    total_contributions = biweekly_periods * 1269.23 # $33k Annual / 26
     
     return h_val, m_bal, total_contributions
 
@@ -107,7 +102,7 @@ def load_all_pillars():
         {'Name': 'FELG (Roth IRA)', 'Tkr': 'FELG', 'Qty': 386, 'Pillar': 'Retirement'},
         {'Name': 'WFSPX (Roth 401k)', 'Tkr': 'WFSPX', 'Qty': 157.092, 'Pillar': 'Retirement'},
         {'Name': 'JLGMX (Roth 401k)', 'Tkr': 'JLGMX', 'Qty': 641.5629, 'Pillar': 'Retirement'},
-        {'Name': 'Automatic Contributions', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Retirement', 'Base': auto_401k},
+        {'Name': 'Auto Contributions', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Retirement', 'Base': auto_401k},
         
         # PILLAR 4: College Fund
         {'Name': 'VTSAX (College)', 'Tkr': 'VTSAX', 'Qty': 209.296, 'Pillar': 'College Fund'},
@@ -115,6 +110,9 @@ def load_all_pillars():
         
         # PILLAR 5: Non-US/India
         {'Name': 'India Assets', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Non-US/India', 'Base': 300000},
+
+        # NEW: Cash Pillar
+        {'Name': 'HYSA Savings', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Cash', 'Base': 40000},
         
         # SYSTEM
         {'Name': 'Roswell Home', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Real Estate', 'Base': h_val},
@@ -140,18 +138,21 @@ df = load_all_pillars()
 # --- CALCULATIONS ---
 nw = df['Curr'].sum()
 day_p = df['Chg'].sum()
-fire_cur = df[df['Pillar'].isin(['Robinhood', 'ETRADE', 'Non-US/India'])]['Curr'].sum()
+# REFINED FIRE ASSETS: Robinhood + ETRADE + India + Cash
+fire_cur = df[df['Pillar'].isin(['Robinhood', 'ETRADE', 'Non-US/India', 'Cash'])]['Curr'].sum()
 fire_pct = min(fire_cur / FIRE_TARGET, 1.0)
 
 # --- DASHBOARD ---
 st.title("🔥 FIRE Pulse")
-st.subheader(f"Strategy Dashboard | Net Worth: ${nw:,.0f}")
+st.subheader(f"Portfolio Control Center")
 
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Current NW", f"${nw:,.0f}", delta=f"${day_p:,.2f}")
-col2.metric("FIRE Assets", f"${fire_cur:,.0f}")
-col3.metric("Retirement", f"${df[df['Pillar']=='Retirement']['Curr'].sum():,.0f}")
-col4.metric("College Fund", f"${df[df['Pillar']=='College Fund']['Curr'].sum():,.0f}")
+m1, m2, m3, m4 = st.columns(4)
+m1.metric("Net Worth", f"${nw:,.0f}", delta=f"${day_p:,.2f}")
+m1.caption("Includes all 5 Pillars + RE")
+m2.metric("FIRE Asset Value", f"${fire_cur:,.0f}")
+m2.caption("RH + ET + India + Cash")
+m3.metric("Cash (HYSA)", f"${df[df['Pillar']=='Cash']['Curr'].sum():,.0f}")
+m4.metric("College Fund", f"${df[df['Pillar']=='College Fund']['Curr'].sum():,.0f}")
 
 st.divider()
 st.subheader(f"Progress to $1M FIRE Goal: {fire_pct:.1%}")
@@ -165,10 +166,10 @@ with c1:
     fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"))
     st.plotly_chart(fig, use_container_width=True)
 with c2:
-    st.subheader("Pillar Summary")
-    for p in ['Robinhood', 'ETRADE', 'Retirement', 'College Fund', 'Non-US/India']:
+    st.subheader("Pillar Breakdown")
+    for p in ['Robinhood', 'ETRADE', 'Retirement', 'College Fund', 'Non-US/India', 'Cash']:
         st.write(f"**{p}**: ${df[df['Pillar'] == p]['Curr'].sum():,.0f}")
 
 st.divider()
-st.subheader("Asset Ledger")
+st.subheader("Detailed Ledger")
 st.dataframe(df[['Pillar', 'Name', 'Curr', 'Chg']].sort_values(['Pillar', 'Curr'], ascending=False).style.format({'Curr': '${:,.2f}', 'Chg': '${:,.2f}'}), use_container_width=True, hide_index=True)
