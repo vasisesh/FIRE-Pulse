@@ -15,12 +15,14 @@ st.markdown("""
     [data-testid="stMetricLabel"] { color: #4b5563 !important; font-weight: 600 !important; }
     [data-testid="stMetricValue"] { color: #111827 !important; font-weight: 800 !important; }
     .main { background-color: #0e1117; }
+    /* FIRE Progress Bar (Teal) */
     .stProgress > div > div > div > div { background-image: linear-gradient(to right, #008080 , #00ffcc); }
     </style>
     """, unsafe_allow_html=True)
 
 # --- CONSTANTS ---
 FIRE_TARGET = 1000000
+NW_TARGET = 2500000
 
 # --- ENGINES ---
 def calculate_dynamic_values():
@@ -35,11 +37,11 @@ def calculate_dynamic_values():
     m_bal = 480000 * (r_h + 1)**h_months - (m_pay / r_h) * ((r_h + 1)**h_months - 1)
     h_val = 600000 * (1 + (1.025**(1/12)-1))**h_months
     
-    # 2. 401k Contribution Engine (Starts Jan 2026)
+    # 2. 401k Contribution Engine
     c_start = datetime(2026, 1, 1)
     days_passed = (now - c_start).days
     biweekly_periods = max(0, days_passed // 14)
-    total_contributions = biweekly_periods * 1269.23 # $33k Annual / 26
+    total_contributions = biweekly_periods * 1269.23
     
     return h_val, m_bal, total_contributions
 
@@ -102,7 +104,7 @@ def load_all_pillars():
         {'Name': 'FELG (Roth IRA)', 'Tkr': 'FELG', 'Qty': 386, 'Pillar': 'Retirement'},
         {'Name': 'WFSPX (Roth 401k)', 'Tkr': 'WFSPX', 'Qty': 157.092, 'Pillar': 'Retirement'},
         {'Name': 'JLGMX (Roth 401k)', 'Tkr': 'JLGMX', 'Qty': 641.5629, 'Pillar': 'Retirement'},
-        {'Name': 'Auto Contributions', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Retirement', 'Base': auto_401k},
+        {'Name': 'Auto 401k Growth', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Retirement', 'Base': auto_401k},
         
         # PILLAR 4: College Fund
         {'Name': 'VTSAX (College)', 'Tkr': 'VTSAX', 'Qty': 209.296, 'Pillar': 'College Fund'},
@@ -111,7 +113,7 @@ def load_all_pillars():
         # PILLAR 5: Non-US/India
         {'Name': 'India Assets', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Non-US/India', 'Base': 300000},
 
-        # NEW: Cash Pillar
+        # CASH
         {'Name': 'HYSA Savings', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Cash', 'Base': 40000},
         
         # SYSTEM
@@ -138,38 +140,48 @@ df = load_all_pillars()
 # --- CALCULATIONS ---
 nw = df['Curr'].sum()
 day_p = df['Chg'].sum()
-# REFINED FIRE ASSETS: Robinhood + ETRADE + India + Cash
 fire_cur = df[df['Pillar'].isin(['Robinhood', 'ETRADE', 'Non-US/India', 'Cash'])]['Curr'].sum()
+
 fire_pct = min(fire_cur / FIRE_TARGET, 1.0)
+nw_pct = min(nw / NW_TARGET, 1.0)
 
 # --- DASHBOARD ---
-st.title("🔥 FIRE Pulse")
-st.subheader(f"Portfolio Control Center")
+st.title("🔥 FIRE Pulse: The Road to Freedom")
 
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("Net Worth", f"${nw:,.0f}", delta=f"${day_p:,.2f}")
-m1.caption("Includes all 5 Pillars + RE")
-m2.metric("FIRE Asset Value", f"${fire_cur:,.0f}")
-m2.caption("RH + ET + India + Cash")
-m3.metric("Cash (HYSA)", f"${df[df['Pillar']=='Cash']['Curr'].sum():,.0f}")
-m4.metric("College Fund", f"${df[df['Pillar']=='College Fund']['Curr'].sum():,.0f}")
+col1, col2, col3 = st.columns(3)
+col1.metric("Total Net Worth", f"${nw:,.0f}", delta=f"${day_p:,.2f}")
+col2.metric("FIRE Asset Value", f"${fire_cur:,.0f}")
+col3.metric("Gap to $2.5M", f"${max(0, NW_TARGET - nw):,.0f}")
 
 st.divider()
-st.subheader(f"Progress to $1M FIRE Goal: {fire_pct:.1%}")
-st.progress(fire_pct)
 
-st.divider()
-c1, c2 = st.columns([1.5, 1])
+# MILESTONE TRACKERS
+c1, c2 = st.columns(2)
 with c1:
+    st.subheader(f"FIRE Goal ($1M): {fire_pct:.1%}")
+    st.progress(fire_pct)
+    st.caption("Liquid: RH + ET + India + Cash")
+
+with c2:
+    st.subheader(f"Net Worth Goal ($2.5M): {nw_pct:.1%}")
+    st.progress(nw_pct)
+    st.caption("Full Portfolio: Pillars + Real Estate")
+
+st.divider()
+
+# Visuals
+charts_left, summary_right = st.columns([1.5, 1])
+with charts_left:
     st.subheader("Asset Allocation")
     fig = px.pie(df[df['Curr'] > 0], values='Curr', names='Pillar', hole=0.5, color_discrete_sequence=px.colors.sequential.Teal)
     fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"))
     st.plotly_chart(fig, use_container_width=True)
-with c2:
+with summary_right:
     st.subheader("Pillar Breakdown")
-    for p in ['Robinhood', 'ETRADE', 'Retirement', 'College Fund', 'Non-US/India', 'Cash']:
-        st.write(f"**{p}**: ${df[df['Pillar'] == p]['Curr'].sum():,.0f}")
+    for p in ['Robinhood', 'ETRADE', 'Retirement', 'College Fund', 'Non-US/India', 'Cash', 'Real Estate']:
+        val = df[df['Pillar'] == p]['Curr'].sum()
+        st.write(f"**{p}**: ${val:,.0f}")
 
 st.divider()
-st.subheader("Detailed Ledger")
+st.subheader("Full Ledger")
 st.dataframe(df[['Pillar', 'Name', 'Curr', 'Chg']].sort_values(['Pillar', 'Curr'], ascending=False).style.format({'Curr': '${:,.2f}', 'Chg': '${:,.2f}'}), use_container_width=True, hide_index=True)
