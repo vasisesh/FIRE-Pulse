@@ -39,14 +39,15 @@ SWR = 0.035         # 3.5% Safe Withdrawal Rate
 # --- 3. DYNAMIC VALUE ENGINES ---
 def calculate_dynamic_values():
     now = datetime.now()
-    # Home Equity
+    # Home Equity logic
     h_start = datetime(2022, 4, 1)
     h_months = (relativedelta(now, h_start).years * 12) + relativedelta(now, h_start).months
     r_h, n_h = 0.0299 / 12, 15 * 12
     m_pay = 480000 * (r_h * (1 + r_h)**n_h) / ((1 + r_h)**n_h - 1)
     m_bal = 480000 * (r_h + 1)**h_months - (m_pay / r_h) * ((r_h + 1)**h_months - 1)
     h_val = 600000 * (1 + (1.025**(1/12)-1))**h_months
-    # Contributions
+    
+    # Retirement contributions logic
     biweekly_periods = max(0, (now - datetime(2026, 1, 1)).days // 14)
     total_401k = biweekly_periods * 1269.23
     hsa_p = (7750 + 8300 + 8300) + max(0, ((now.year - 2026) * 12 + now.month) * 712.50)
@@ -55,24 +56,28 @@ def calculate_dynamic_values():
 def load_all_data():
     h_val, m_bal, auto_401k, hsa_p = calculate_dynamic_values()
     data = [
-        # PILLAR 1: Robinhood (High Risk)
+        # PILLAR 1: Robinhood (High Tech Focus)
         {'Name': 'AAPL', 'Tkr': 'AAPL', 'Qty': 32.875, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'NVDA', 'Tkr': 'NVDA', 'Qty': 41.067, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'VGT', 'Tkr': 'VGT', 'Qty': 88.524, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'Bitcoin', 'Tkr': 'BTC-USD', 'Qty': 0.0675, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'AMD', 'Tkr': 'AMD', 'Qty': 17.228, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'NFLX', 'Tkr': 'NFLX', 'Qty': 77.977, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        # PILLAR 2: ETRADE (Mid Risk)
+        # PILLAR 2: ETRADE
         {'Name': 'VTSAX (ET)', 'Tkr': 'VTSAX', 'Qty': 1080, 'Pillar': 'ETRADE', 'Risk': 'Mid'},
         # PILLAR 3: Retirement
         {'Name': 'VTSAX (Roth IRA)', 'Tkr': 'VTSAX', 'Qty': 3318.528, 'Pillar': 'Retirement', 'Risk': 'Mid'},
         {'Name': 'WFSPX (401k)', 'Tkr': 'WFSPX', 'Qty': 157.092, 'Pillar': 'Retirement', 'Risk': 'Mid'},
-        {'Name': 'Auto 401k', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Retirement', 'Base': auto_401k, 'Risk': 'Mid'},
-        # PILLAR 5: Non-US/India & HSA (Low Risk)
+        {'Name': 'Auto 401k Growth', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Retirement', 'Base': auto_401k, 'Risk': 'Mid'},
+        # PILLAR 4: College Fund
+        {'Name': 'VTSAX (College)', 'Tkr': 'VTSAX', 'Qty': 209.296, 'Pillar': 'College Fund', 'Risk': 'Mid'},
+        {'Name': 'VTI (College)', 'Tkr': 'VTI', 'Qty': 222.203, 'Pillar': 'College Fund', 'Risk': 'Mid'},
+        # PILLAR 5: Non-US/India & HSA
         {'Name': 'India Assets', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Non-US/India', 'Base': 300000, 'Risk': 'Low'},
-        {'Name': 'HSA (VTSAX)', 'Tkr': 'VTSAX', 'Qty': (hsa_p / 120), 'Pillar': 'Non-US/India', 'Risk': 'Mid'},
+        {'Name': 'HSA (VTSAX Invested)', 'Tkr': 'VTSAX', 'Qty': (hsa_p / 120), 'Pillar': 'Non-US/India', 'Risk': 'Mid'},
         # PILLAR 6: Cash
         {'Name': 'HYSA Savings', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Cash', 'Base': 40000, 'Risk': 'Low'},
-        # SYSTEM
+        # SYSTEM (Property)
         {'Name': 'Roswell Home', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Real Estate', 'Base': h_val, 'Risk': 'Low'},
         {'Name': 'Mortgage Debt', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Liability', 'Base': -m_bal, 'Risk': 'Low'}
     ]
@@ -87,6 +92,7 @@ def load_all_data():
         df[['Curr', 'Prev']] = df.apply(lambda x: pd.Series(get_v(x)), axis=1)
     except:
         df['Curr'] = df.get('Base', 0); df['Prev'] = df['Curr']
+    
     df['Chg_$'] = (df['Curr'] - df['Prev']).fillna(0)
     df['Chg_%'] = ((df['Curr'] / df['Prev'] - 1) * 100).fillna(0)
     return df
@@ -97,11 +103,11 @@ df = load_all_data()
 nw_curr = df['Curr'].sum()
 liquid_total = df[df['Pillar'].isin(['Robinhood', 'ETRADE', 'Non-US/India', 'Cash'])]['Curr'].sum()
 
-# Risk Concentration Score
+# Risk Concentration Score (Tech vs Liquid)
 high_risk_val = df[df['Risk'] == 'High']['Curr'].sum()
 risk_score = (high_risk_val / liquid_total) * 100
 
-# Future Projection
+# Roadmap projection
 def project_wealth(base, rate):
     months = YEARS_TO_GO * 12
     m_rate = (1 + rate)**(1/12) - 1
@@ -115,7 +121,7 @@ monthly_runway = (final_val * SWR) / 12
 
 # --- 5. UI DASHBOARD ---
 st.title("🛡️ THE VASIREDDY FORTRESS")
-st.caption(f"Status: Age {CUR_AGE} • Vision: Retire at {RET_AGE} (2035) • Obsidian v2.4 Mastery")
+st.caption(f"Status: Age {CUR_AGE} • Target: Age {RET_AGE} (2035) • Mastery Build v2.4")
 
 m1, m2, m3 = st.columns(3)
 m1.metric("TOTAL NET WORTH", f"${nw_curr:,.0f}", delta=f"${df['Chg_$'].sum():,.2f}")
@@ -150,13 +156,13 @@ with g_col:
 with t_col:
     st.write("### Strategy Insight")
     if risk_score > 75:
-        st.error("**Heat Level: Critical.** High Tech/AI coupling detected.")
+        st.error("**Heat Level: Critical.** Portfolio is heavily tech-coupled.")
     elif risk_score > 40:
-        st.warning("**Heat Level: Optimal.** Balanced growth vs stability.")
+        st.warning("**Heat Level: Optimal.** Balanced mix of tech and stable assets.")
     else:
-        st.success("**Heat Level: Defensive.** Portfolio well-insulated.")
+        st.success("**Heat Level: Defensive.** Portfolio is insulated from market tech-swings.")
     
-    st.info(f"**Projected 2035 Monthly Income:** **${monthly_runway:,.0f}/month** (Nominal).")
+    st.info(f"**Projected 2035 Monthly Income:** **${monthly_runway:,.0f}/month**.")
 
 st.divider()
 
@@ -175,10 +181,14 @@ with c2:
     fig_pie = px.pie(df[df['Curr']>0], values='Curr', names='Pillar', hole=0.6, color_discrete_sequence=px.colors.sequential.Tealgrn)
     fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"), showlegend=False)
     st.plotly_chart(fig_pie, use_container_width=True)
+    # Pillar Detail List
+    p_sum = df.groupby('Pillar')['Curr'].sum()
+    for p in ['Robinhood', 'ETRADE', 'Retirement', 'Non-US/India', 'Cash']:
+        st.write(f"**{p}**: ${p_sum.get(p, 0):,.0f}")
 
 st.divider()
 
-# --- RESTORED: ROBINHOOD TOP 10 ---
+# --- ROBINHOOD TOP 10 ---
 rh_df = df[df['Pillar'] == 'Robinhood'].copy()
 rh_total = rh_df['Curr'].sum()
 rh_df['Port_%'] = (rh_df['Curr'] / rh_total) * 100
@@ -199,7 +209,7 @@ with t10_col_table:
 
 st.divider()
 
-# --- RESTORED: MASTER LEDGER ---
+# --- MASTER LEDGER ---
 st.subheader("MASTER ASSET LEDGER")
 def style_ledger(val):
     if isinstance(val, (int, float)):
