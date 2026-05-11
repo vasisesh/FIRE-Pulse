@@ -26,6 +26,8 @@ NW_TARGET = 2500000
 # --- ENGINES ---
 def calculate_dynamic_values():
     now = datetime.now()
+    
+    # 1. Home Equity (Roswell, GA)
     h_start = datetime(2022, 4, 1)
     h_delta = relativedelta(now, h_start)
     h_months = h_delta.years * 12 + h_delta.months
@@ -34,6 +36,7 @@ def calculate_dynamic_values():
     m_bal = 480000 * (r_h + 1)**h_months - (m_pay / r_h) * ((r_h + 1)**h_months - 1)
     h_val = 600000 * (1 + (1.025**(1/12)-1))**h_months
     
+    # 2. 401k Contribution Engine ($33k/year total since Jan 2026)
     c_start = datetime(2026, 1, 1)
     days_passed = (now - c_start).days
     biweekly_periods = max(0, days_passed // 14)
@@ -94,12 +97,12 @@ def load_all_pillars():
         {'Name': 'VFIAX (ET)', 'Tkr': 'VFIAX', 'Qty': 15.115, 'Pillar': 'ETRADE'},
         {'Name': 'VTIAX (ET)', 'Tkr': 'VTIAX', 'Qty': 225.887, 'Pillar': 'ETRADE'},
         
-        # PILLAR 3: Retirement
+        # PILLAR 3: Retirement (Roth IRA + Roth 401k)
         {'Name': 'VTSAX (Roth IRA)', 'Tkr': 'VTSAX', 'Qty': 3318.528, 'Pillar': 'Retirement'},
         {'Name': 'FELG (Roth IRA)', 'Tkr': 'FELG', 'Qty': 386, 'Pillar': 'Retirement'},
         {'Name': 'WFSPX (Roth 401k)', 'Tkr': 'WFSPX', 'Qty': 157.092, 'Pillar': 'Retirement'},
         {'Name': 'JLGMX (Roth 401k)', 'Tkr': 'JLGMX', 'Qty': 641.5629, 'Pillar': 'Retirement'},
-        {'Name': 'Auto 401k Growth', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Retirement', 'Base': auto_401k},
+        {'Name': 'Auto 401k Principal', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Retirement', 'Base': auto_401k},
         
         # PILLAR 4: College Fund
         {'Name': 'VTSAX (College)', 'Tkr': 'VTSAX', 'Qty': 209.296, 'Pillar': 'College Fund'},
@@ -151,40 +154,36 @@ col3.metric("Gap to $2.5M", f"${max(0, NW_TARGET - nw):,.0f}")
 
 st.divider()
 
-# Progress Section
-prog_l, prog_r = st.columns(2)
-with prog_l:
+c1, c2 = st.columns(2)
+with c1:
     st.subheader(f"FIRE Goal ($1M): {fire_pct:.1%}")
     st.progress(fire_pct)
-with prog_r:
+with c2:
     st.subheader(f"Net Worth Goal ($2.5M): {nw_pct:.1%}")
     st.progress(nw_pct)
 
 st.divider()
 
-# --- NEW: Top Robinhood Holdings Chart ---
+# --- Top Robinhood Holdings Chart ---
 rh_df = df[df['Pillar'] == 'Robinhood'].copy()
 rh_total = rh_df['Curr'].sum()
 rh_df['Port_%'] = (rh_df['Curr'] / rh_total) * 100
 top_10_rh = rh_df.sort_values('Curr', ascending=False).head(10)
 
-st.subheader("Top 10 Robinhood Holdings")
+st.subheader("Top 10 Robinhood Concentration")
+# Fixed color scale to 'teal' (lowercase) or standard Plotly colors
 fig_rh = px.bar(
     top_10_rh, 
     x='Name', 
     y='Curr', 
     text_auto='.2s',
-    labels={'Curr': 'Value ($)', 'Name': 'Ticker'},
     color='Curr',
-    color_continuous_scale='Teals',
+    color_continuous_scale='teal',
     hover_data={'Curr': ':$,.2f', 'Port_%': ':.2f%'}
 )
 fig_rh.update_layout(
-    showlegend=False, 
-    coloraxis_showscale=False,
-    paper_bgcolor='rgba(0,0,0,0)',
-    plot_bgcolor='rgba(0,0,0,0)',
-    font=dict(color="white")
+    showlegend=False, coloraxis_showscale=False,
+    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color="white")
 )
 st.plotly_chart(fig_rh, use_container_width=True)
 
@@ -193,9 +192,11 @@ st.divider()
 # Ledger Section
 st.subheader("Full Ledger (Daily Movement)")
 def color_change(val):
-    color = '#28a745' if val > 0 else '#dc3545' if val < 0 else 'white'
-    return f'color: {color}'
+    if val > 0: return 'color: #28a745'
+    if val < 0: return 'color: #dc3545'
+    return 'color: white'
 
+# Using .style.map for newer Pandas versions
 st.dataframe(
     df[['Pillar', 'Name', 'Curr', 'Chg_$', 'Chg_%']]
     .sort_values(['Pillar', 'Curr'], ascending=False)
