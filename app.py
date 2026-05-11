@@ -26,6 +26,8 @@ NW_TARGET = 2500000
 # --- ENGINES ---
 def calculate_dynamic_values():
     now = datetime.now()
+    
+    # 1. Home Equity (Roswell, GA)
     h_start = datetime(2022, 4, 1)
     h_delta = relativedelta(now, h_start)
     h_months = h_delta.years * 12 + h_delta.months
@@ -34,15 +36,29 @@ def calculate_dynamic_values():
     m_bal = 480000 * (r_h + 1)**h_months - (m_pay / r_h) * ((r_h + 1)**h_months - 1)
     h_val = 600000 * (1 + (1.025**(1/12)-1))**h_months
     
+    # 2. 401k Contribution Engine ($33k/year total since Jan 2026)
     c_start = datetime(2026, 1, 1)
     days_passed = (now - c_start).days
     biweekly_periods = max(0, days_passed // 14)
-    total_contributions = biweekly_periods * 1269.23
+    total_401k_contributions = biweekly_periods * 1269.23
     
-    return h_val, m_bal, total_contributions
+    # 3. HSA Engine (Family Maxing since 2023)
+    # 2023: $7,750 | 2024: $8,300 | 2025: $8,300
+    hsa_past_principal = 7750 + 8300 + 8300
+    # 2026: $8,550 max ($712.50 per month)
+    hsa_2026_months = (now.year - 2026) * 12 + now.month
+    hsa_2026_contrib = max(0, hsa_2026_months * 712.50)
+    total_hsa_principal = hsa_past_principal + hsa_2026_contrib
+    
+    return h_val, m_bal, total_401k_contributions, total_hsa_principal
 
 def load_all_pillars():
-    h_val, m_bal, auto_401k = calculate_dynamic_values()
+    h_val, m_bal, auto_401k, hsa_principal = calculate_dynamic_values()
+    
+    # Estimate HSA shares based on a proxy price if historical entry points aren't exact, 
+    # but for this logic, we treat the total principal as a "Fixed" value that grows with the fund price.
+    # We'll use VTSAX price to scale the HSA principal.
+    
     data = [
         # PILLAR 1: Robinhood
         {'Name': 'AAPL', 'Tkr': 'AAPL', 'Qty': 32.875151, 'Pillar': 'Robinhood'},
@@ -105,8 +121,10 @@ def load_all_pillars():
         {'Name': 'VTSAX (College)', 'Tkr': 'VTSAX', 'Qty': 209.296, 'Pillar': 'College Fund'},
         {'Name': 'VTI (College)', 'Tkr': 'VTI', 'Qty': 222.203, 'Pillar': 'College Fund'},
         
-        # PILLAR 5: Non-US/India
+        # PILLAR 5: Non-US/India & HSA
         {'Name': 'India Assets', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Non-US/India', 'Base': 300000},
+        # HSA is tracked here using VTSAX for growth on the calculated principal
+        {'Name': 'HSA (VTSAX Invested)', 'Tkr': 'VTSAX', 'Qty': (hsa_principal / 115), 'Pillar': 'Non-US/India'},
 
         # PILLAR 6: Cash
         {'Name': 'HYSA Savings', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Cash', 'Base': 40000},
@@ -148,62 +166,36 @@ nw_goal_pct = min(nw_curr / NW_TARGET, 1.0)
 st.title("🔥 FIRE Pulse")
 
 col1, col2, col3 = st.columns(3)
-# Updated Metric with Percentage Ticker
 col1.metric("Total Net Worth", f"${nw_curr:,.0f}", delta=f"${nw_chg_dollar:,.2f} ({nw_chg_pct:.2f}%)")
 col2.metric("FIRE Asset Value", f"${fire_cur:,.0f}")
 col3.metric("Gap to $2.5M", f"${max(0, NW_TARGET - nw_curr):,.0f}")
 
 st.divider()
 
-# Progress bars
-prog_col1, prog_col2 = st.columns(2)
-with prog_col1:
+c1, c2 = st.columns(2)
+with c1:
     st.subheader(f"FIRE Goal ($1M): {fire_pct:.1%}")
     st.progress(fire_pct)
-with prog_col2:
+with c2:
     st.subheader(f"Net Worth Goal ($2.5M): {nw_goal_pct:.1%}")
     st.progress(nw_goal_pct)
 
 st.divider()
 
-# PILLAR CHARTS & SUMMARY
-charts_left, summary_right = st.columns([1.5, 1])
-with charts_left:
-    st.subheader("Asset Allocation by Pillar")
+# Allocation & Summary
+l_col, r_col = st.columns([1.5, 1])
+with l_col:
+    st.subheader("Asset Allocation")
     fig_pie = px.pie(df[df['Curr'] > 0], values='Curr', names='Pillar', hole=0.5, color_discrete_sequence=px.colors.sequential.Teal)
     fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"))
     st.plotly_chart(fig_pie, use_container_width=True)
-
-with summary_right:
+with r_col:
     st.subheader("Pillar Summary")
-    p_summary = df.groupby('Pillar')['Curr'].sum()
+    p_sum = df.groupby('Pillar')['Curr'].sum()
     for p in ['Robinhood', 'ETRADE', 'Retirement', 'College Fund', 'Non-US/India', 'Cash', 'Real Estate']:
-        val = p_summary.get(p, 0)
-        st.write(f"**{p}**: ${val:,.0f}")
+        st.write(f"**{p}**: ${p_sum.get(p, 0):,.0f}")
 
 st.divider()
-
-# Top 10 Robinhood Chart
-rh_df = df[df['Pillar'] == 'Robinhood'].copy()
-rh_total = rh_df['Curr'].sum()
-rh_df['Port_%'] = (rh_df['Curr'] / rh_total) * 100
-top_10_rh = rh_df.sort_values('Curr', ascending=False).head(10)
-
-st.subheader("Top 10 Robinhood Concentration")
-fig_rh = px.bar(
-    top_10_rh, x='Name', y='Curr', text_auto='.2s',
-    color='Curr', color_continuous_scale='teal',
-    hover_data={'Curr': ':$,.2f', 'Port_%': ':.2f%'}
-)
-fig_rh.update_layout(
-    showlegend=False, coloraxis_showscale=False,
-    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color="white")
-)
-st.plotly_chart(fig_rh, use_container_width=True)
-
-st.divider()
-
-# Ledger Section
 st.subheader("Full Ledger (Daily Movement)")
 def color_change(val):
     if val > 0: return 'color: #28a745'
@@ -213,12 +205,7 @@ def color_change(val):
 st.dataframe(
     df[['Pillar', 'Name', 'Curr', 'Chg_$', 'Chg_%']]
     .sort_values(['Pillar', 'Curr'], ascending=False)
-    .style.format({
-        'Curr': '${:,.2f}', 
-        'Chg_$': '${:,.2f}', 
-        'Chg_%': '{:,.2f}%'
-    })
+    .style.format({'Curr': '${:,.2f}', 'Chg_$': '${:,.2f}', 'Chg_%': '{:,.2f}%'})
     .map(color_change, subset=['Chg_$', 'Chg_%']), 
-    use_container_width=True, 
-    hide_index=True
+    use_container_width=True, hide_index=True
 )
