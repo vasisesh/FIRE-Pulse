@@ -34,7 +34,6 @@ NW_TARGET = 2500000
 # --- 3. DYNAMIC VALUE ENGINES ---
 def calculate_dynamic_values():
     now = datetime.now()
-    # Home Equity logic (Roswell GA baseline)
     h_start = datetime(2022, 4, 1)
     h_months = (relativedelta(now, h_start).years * 12) + relativedelta(now, h_start).months
     r_h, n_h = 0.0299 / 12, 15 * 12
@@ -49,27 +48,52 @@ def calculate_dynamic_values():
 
 def load_all_data():
     h_val, m_bal, auto_401k, hsa_p = calculate_dynamic_values()
+    
+    # Comprehensive Ticker List from provided screenshot
     data = [
-        # PILLAR 1: Robinhood (Full Asset Sync)
+        # PILLAR 1: Robinhood (Taxable Brokerage)
         {'Name': 'AAPL', 'Tkr': 'AAPL', 'Qty': 32.875151, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'AMD', 'Tkr': 'AMD', 'Qty': 17.228305, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'AMZN', 'Tkr': 'AMZN', 'Qty': 6.139473, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'ANET', 'Tkr': 'ANET', 'Qty': 6.970517, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'AVGO', 'Tkr': 'AVGO', 'Qty': 17.692543, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'ANET', 'Tkr': 'ANET', 'Qty': 5.85366 + 1.116857, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'AVGO', 'Tkr': 'AVGO', 'Qty': 16.015482 + 1.677061, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'CRWD', 'Tkr': 'CRWD', 'Qty': 6.730194, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'DELL', 'Tkr': 'DELL', 'Qty': 7.15184, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'DIS', 'Tkr': 'DIS', 'Qty': 14.709586, 'Pillar': 'Robinhood', 'Risk': 'Mid'},
         {'Name': 'ENPH', 'Tkr': 'ENPH', 'Qty': 10.65757, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'GEV', 'Tkr': 'GEV', 'Qty': 0.985332 + 0.222237, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'GLD', 'Tkr': 'GLD', 'Qty': 3.048105, 'Pillar': 'Robinhood', 'Risk': 'Low'},
         {'Name': 'GOOGL', 'Tkr': 'GOOGL', 'Qty': 42.149825, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'JPM', 'Tkr': 'JPM', 'Qty': 2.753308, 'Pillar': 'Robinhood', 'Risk': 'Mid'},
         {'Name': 'META', 'Tkr': 'META', 'Qty': 8.317115, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'MRVL', 'Tkr': 'MRVL', 'Qty': 2.385513 + 1.823521, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'MSFT', 'Tkr': 'MSFT', 'Qty': 19.746979, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'NFLX', 'Tkr': 'NFLX', 'Qty': 77.97709, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'NVDA', 'Tkr': 'NVDA', 'Qty': 41.067308, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'PLTR', 'Tkr': 'PLTR', 'Qty': 18.184741, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'PANW', 'Tkr': 'PANW', 'Qty': 2.468968, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'PLTR', 'Tkr': 'PLTR', 'Qty': 12.746453 + 5.438288, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'SHOP', 'Tkr': 'SHOP', 'Qty': 42.621966, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'TSLA', 'Tkr': 'TSLA', 'Qty': 16.669082, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'TSM', 'Tkr': 'TSM', 'Qty': 4.457336, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'TTWO', 'Tkr': 'TTWO', 'Qty': 2.719393, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'UBER', 'Tkr': 'UBER', 'Qty': 42.189843, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'VGT', 'Tkr': 'VGT', 'Qty': 88.524888, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'VRT', 'Tkr': 'VRT', 'Qty': 7.719113 + 0.840221, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'Bitcoin', 'Tkr': 'BTC-USD', 'Qty': 0.06752957, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'CRDO', 'Tkr': 'CRDO', 'Qty': 8.3776, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'CRWV', 'Tkr': 'CRWV', 'Qty': 9, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'FLEX', 'Tkr': 'FLEX', 'Qty': 10, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'HOOD', 'Tkr': 'HOOD', 'Qty': 8, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'INOD', 'Tkr': 'INOD', 'Qty': 17.750223, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'LRCX', 'Tkr': 'LRCX', 'Qty': 9.22168, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'MU', 'Tkr': 'MU', 'Qty': 6.94118, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'NBIS', 'Tkr': 'NBIS', 'Qty': 1, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'OKLO', 'Tkr': 'OKLO', 'Qty': 1.184033, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'PSI', 'Tkr': 'PSI', 'Qty': 2.491277, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'RDDT', 'Tkr': 'RDDT', 'Qty': 4.992676, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'SNDK', 'Tkr': 'SNDK', 'Qty': 4.347362, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'STX', 'Tkr': 'STX', 'Qty': 4.744995, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'WDC', 'Tkr': 'WDC', 'Qty': 8.910648, 'Pillar': 'Robinhood', 'Risk': 'High'},
         
         # PILLAR 2: ETRADE
         {'Name': 'VTSAX (ET)', 'Tkr': 'VTSAX', 'Qty': 1080, 'Pillar': 'ETRADE', 'Risk': 'Mid'},
@@ -102,14 +126,17 @@ def load_all_data():
     df = pd.DataFrame(data)
     tkrs = [t for t in df['Tkr'].unique() if t != 'FIXED']
     try:
-        p_df = yf.download(tkrs, period="7d", progress=False)['Close']
+        p_df = yf.download(tkrs, period="5d", progress=False)['Close']
         def get_v(r):
             if r['Tkr'] == 'FIXED': return r['Base'], r['Base']
-            valid = p_df[r['Tkr']].dropna()
-            return valid.iloc[-1] * r['Qty'], valid.iloc[-2] * r['Qty']
+            ticker_data = p_df[r['Tkr']].dropna()
+            curr_p = ticker_data.iloc[-1]
+            prev_p = ticker_data.iloc[-2] if len(ticker_data) > 1 else curr_p
+            return curr_p * r['Qty'], prev_p * r['Qty']
         df[['Curr', 'Prev']] = df.apply(lambda x: pd.Series(get_v(x)), axis=1)
     except:
-        df['Curr'] = df.get('Base', 0); df['Prev'] = df['Curr']
+        df['Curr'] = df.apply(lambda r: r.get('Base', 0), axis=1)
+        df['Prev'] = df['Curr']
     
     df['Chg_$'] = (df['Curr'] - df['Prev']).fillna(0)
     df['Chg_%'] = ((df['Curr'] / df['Prev'] - 1) * 100).fillna(0)
@@ -122,13 +149,12 @@ nw_curr = df['Curr'].sum()
 liquid_total = df[df['Pillar'].isin(['Robinhood', 'ETRADE', 'Non-US/India', 'Cash'])]['Curr'].sum()
 high_risk_val = df[df['Risk'] == 'High']['Curr'].sum()
 risk_score = (high_risk_val / liquid_total) * 100
-
 fire_progress = min(liquid_total / FIRE_TARGET, 1.0)
 nw_progress = min(nw_curr / NW_TARGET, 1.0)
 
 # --- 5. UI DASHBOARD ---
 st.title("🛡️ THE VASIREDDY FORTRESS V3")
-st.caption("Strategic Risk & Mission Tracker • Obsidian Edition")
+st.caption("Full Asset Inventory • Precision Risk Sync • Obsidian Edition")
 
 m1, m2, m3 = st.columns(3)
 m1.metric("TOTAL NET WORTH", f"${nw_curr:,.0f}", delta=f"${df['Chg_$'].sum():,.2f}")
@@ -137,41 +163,36 @@ m3.metric("TECH CONCENTRATION", f"{risk_score:.1f}%")
 
 st.divider()
 
-# --- IMPROVED RISK GAUGE & MISSION ---
+# --- GAUGE & MISSION ---
 g_col, m_col = st.columns([1, 1])
-
 with g_col:
     st.subheader("RISK TEMPERATURE")
     fig_gauge = go.Figure(go.Indicator(
-        mode = "gauge+number",
-        value = risk_score,
+        mode = "gauge+number", value = risk_score,
         gauge = {
-            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
-            'bar': {'color': "#00E676"},
-            'bgcolor': "rgba(0,0,0,0)",
+            'axis': {'range': [0, 100], 'tickcolor': "white"},
+            'bar': {'color': "#00E676"}, 'bgcolor': "rgba(0,0,0,0)",
             'steps': [
-                {'range': [0, 40], 'color': 'rgba(21, 101, 192, 0.3)'},  # Blue: Defensive
-                {'range': [40, 75], 'color': 'rgba(255, 143, 0, 0.3)'}, # Amber: Growth
-                {'range': [75, 100], 'color': 'rgba(198, 40, 40, 0.3)'} # Red: Aggressive
-            ],
-            'threshold': {'line': {'color': "white", 'width': 4}, 'thickness': 0.75, 'value': risk_score}
+                {'range': [0, 40], 'color': 'rgba(21, 101, 192, 0.3)'},
+                {'range': [40, 75], 'color': 'rgba(255, 143, 0, 0.3)'},
+                {'range': [75, 100], 'color': 'rgba(198, 40, 40, 0.3)'}
+            ]
         }
     ))
-    fig_gauge.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={'color': "white", 'family': "JetBrains Mono"}, height=280)
+    fig_gauge.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, height=280)
     st.plotly_chart(fig_gauge, use_container_width=True)
 
 with m_col:
     st.subheader("CORE MISSION PROGRESS")
     st.write(f"**FIRE Goal ($1.0M Liquid):** {fire_progress:.1%}")
     st.progress(fire_progress)
-    st.write("")
     st.write(f"**Net Worth Goal ($2.5M Total):** {nw_progress:.1%}")
     st.progress(nw_progress)
-    st.info(f"Liquid assets are currently **${liquid_total:,.0f}**. You are **${max(0, FIRE_TARGET - liquid_total):,.0f}** away from the FIRE baseline.")
+    st.info(f"Robinhood Total: **${df[df['Pillar']=='Robinhood']['Curr'].sum():,.0f}**")
 
 st.divider()
 
-# --- PILLAR PROGRESS & ALLOCATION ---
+# --- PILLAR PROGRESS ---
 c1, c2 = st.columns([1, 1])
 with c1:
     st.subheader("Asset Distribution")
@@ -185,14 +206,6 @@ with c2:
         val = p_sum.get(p, 0)
         st.markdown(f"**{p}** <span style='float:right; color:#00E676;'>${val:,.0f}</span>", unsafe_allow_html=True)
         st.progress(min(val/1200000, 1.0))
-
-st.divider()
-
-# --- ROBINHOOD TOP 10 ---
-rh_df = df[df['Pillar'] == 'Robinhood'].copy()
-top_10 = rh_df.sort_values('Curr', ascending=False).head(10)
-st.subheader("ROBINHOOD TOP 10 CONCENTRATION")
-st.dataframe(top_10[['Name', 'Curr', 'Risk']].style.format({'Curr': '${:,.0f}'}), use_container_width=True, hide_index=True)
 
 st.divider()
 
