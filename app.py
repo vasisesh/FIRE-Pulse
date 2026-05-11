@@ -24,25 +24,33 @@ FIRE_TARGET = 1000000
 COLLEGE_TARGET = 125000
 
 # --- ENGINES ---
-def calculate_real_estate():
-    start_date = datetime(2022, 4, 1)
-    purchase_price = 600000
-    mortgage_start = 480000
+def calculate_dynamic_values():
     now = datetime.now()
-    delta = relativedelta(now, start_date)
-    months_passed = delta.years * 12 + delta.months
     
-    r, n = 0.0299 / 12, 15 * 12
-    m_pay = mortgage_start * (r * (1 + r)**n) / ((1 + r)**n - 1)
-    balance = mortgage_start * (1 + r)**months_passed - (m_pay / r) * ((1 + r)**months_passed - 1)
+    # 1. Home Equity
+    h_start = datetime(2022, 4, 1)
+    h_delta = relativedelta(now, h_start)
+    h_months = h_delta.years * 12 + h_delta.months
+    r_h, n_h = 0.0299 / 12, 15 * 12
+    m_pay = 480000 * (r_h * (1 + r_h)**n_h) / ((1 + r_h)**n_h - 1)
+    m_bal = 480000 * (r_h + 1)**h_months - (m_pay / r_h) * ((r_h + 1)**h_months - 1)
+    h_val = 600000 * (1 + (1.025**(1/12)-1))**h_months
     
-    growth_rate = (1 + 0.025)**(1/12) - 1
-    current_house_val = purchase_price * (1 + growth_rate)**months_passed
+    # 2. 401k Contribution Engine (Starts Jan 2026)
+    # Annual: $23,000 (Max) + $10,000 (5% of $200k Match) = $33,000
+    # Bi-weekly: $33,000 / 26 = $1,269.23
+    c_start = datetime(2026, 1, 1)
+    c_delta = relativedelta(now, c_start)
+    # Approx bi-weekly periods passed
+    days_passed = (now - c_start).days
+    biweekly_periods = days_passed // 14
+    total_contributions = biweekly_periods * 1269.23
     
-    return current_house_val, balance
+    return h_val, m_bal, total_contributions
 
 def load_all_pillars():
-    h_val, m_bal = calculate_real_estate()
+    h_val, m_bal, auto_401k = calculate_dynamic_values()
+    
     data = [
         # PILLAR 1: Robinhood
         {'Name': 'AAPL', 'Tkr': 'AAPL', 'Qty': 32.875151, 'Pillar': 'Robinhood'},
@@ -89,90 +97,78 @@ def load_all_pillars():
         {'Name': 'Bitcoin', 'Tkr': 'BTC-USD', 'Qty': 0.06752957, 'Pillar': 'Robinhood'},
         
         # PILLAR 2: ETRADE
-        {'Name': 'Total Stock Market', 'Tkr': 'VTSAX', 'Qty': 1080, 'Pillar': 'ETRADE'},
-        {'Name': 'US Growth Fund', 'Tkr': 'VWUSX', 'Qty': 82.772, 'Pillar': 'ETRADE'},
-        {'Name': 'S&P 500 Index', 'Tkr': 'VFIAX', 'Qty': 15.115, 'Pillar': 'ETRADE'},
-        {'Name': 'International Stock', 'Tkr': 'VTIAX', 'Qty': 225.887, 'Pillar': 'ETRADE'},
+        {'Name': 'VTSAX (ET)', 'Tkr': 'VTSAX', 'Qty': 1080, 'Pillar': 'ETRADE'},
+        {'Name': 'VWUSX (ET)', 'Tkr': 'VWUSX', 'Qty': 82.772, 'Pillar': 'ETRADE'},
+        {'Name': 'VFIAX (ET)', 'Tkr': 'VFIAX', 'Qty': 15.115, 'Pillar': 'ETRADE'},
+        {'Name': 'VTIAX (ET)', 'Tkr': 'VTIAX', 'Qty': 225.887, 'Pillar': 'ETRADE'},
         
         # PILLAR 3: Retirement
         {'Name': 'VTSAX (Roth IRA)', 'Tkr': 'VTSAX', 'Qty': 3318.528, 'Pillar': 'Retirement'},
         {'Name': 'FELG (Roth IRA)', 'Tkr': 'FELG', 'Qty': 386, 'Pillar': 'Retirement'},
+        {'Name': 'WFSPX (Roth 401k)', 'Tkr': 'WFSPX', 'Qty': 157.092, 'Pillar': 'Retirement'},
+        {'Name': 'JLGMX (Roth 401k)', 'Tkr': 'JLGMX', 'Qty': 641.5629, 'Pillar': 'Retirement'},
+        {'Name': 'Automatic Contributions', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Retirement', 'Base': auto_401k},
         
-        # PILLAR 4: College Fund (Vikram 529)
+        # PILLAR 4: College Fund
         {'Name': 'VTSAX (College)', 'Tkr': 'VTSAX', 'Qty': 209.296, 'Pillar': 'College Fund'},
         {'Name': 'VTI (College)', 'Tkr': 'VTI', 'Qty': 222.203, 'Pillar': 'College Fund'},
         
         # PILLAR 5: Non-US/India
-        {'Name': 'India Assets', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Non-US/India', 'Base_Val': 300000},
+        {'Name': 'India Assets', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Non-US/India', 'Base': 300000},
         
         # SYSTEM
-        {'Name': 'Roswell Home', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Real Estate', 'Base_Val': h_val},
-        {'Name': 'Mortgage Debt', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Liability', 'Base_Val': -m_bal}
+        {'Name': 'Roswell Home', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Real Estate', 'Base': h_val},
+        {'Name': 'Mortgage Debt', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Liability', 'Base': -m_bal}
     ]
     df = pd.DataFrame(data)
     tkrs = df[df['Tkr'] != 'FIXED']['Tkr'].unique().tolist()
     try:
-        # Pushing to 7 days for maximum lookback reliability
         p_df = yf.download(tkrs, period="7d", group_by='ticker', progress=False)
         def get_v(r):
-            if r['Tkr'] == 'FIXED': return r['Base_Val'], r['Base_Val']
-            try:
-                # Skips empty values (weekends) and takes the last valid business closes
-                valid = p_df[r['Tkr']]['Close'].dropna()
-                return valid.iloc[-1] * r['Qty'], valid.iloc[-2] * r['Qty']
-            except:
-                return 0, 0
-        df[['Curr_Val', 'Prev_Val']] = df.apply(lambda x: pd.Series(get_v(x)), axis=1)
+            if r['Tkr'] == 'FIXED': return r['Base'], r['Base']
+            valid = p_df[r['Tkr']]['Close'].dropna()
+            return valid.iloc[-1] * r['Qty'], valid.iloc[-2] * r['Qty']
+        df[['Curr', 'Prev']] = df.apply(lambda x: pd.Series(get_v(x)), axis=1)
     except:
-        df['Curr_Val'] = df.get('Base_Val', 0)
-        df['Prev_Val'] = df['Curr_Val']
-    df['Day_Chg'] = (df['Curr_Val'] - df['Prev_Val']).fillna(0)
+        df['Curr'] = df.get('Base', 0)
+        df['Prev'] = df['Curr']
+    df['Chg'] = (df['Curr'] - df['Prev']).fillna(0)
     return df
 
 df = load_all_pillars()
 
 # --- CALCULATIONS ---
-nw = df['Curr_Val'].sum()
-day_p = df['Day_Chg'].sum()
-fire_current = df[df['Pillar'].isin(['Robinhood', 'ETRADE', 'Non-US/India'])]['Curr_Val'].sum()
-fire_pct = min(fire_current / FIRE_TARGET, 1.0)
-ret_val = df[df['Pillar'] == 'Retirement']['Curr_Val'].sum()
-col_val = df[df['Pillar'] == 'College Fund']['Curr_Val'].sum()
+nw = df['Curr'].sum()
+day_p = df['Chg'].sum()
+fire_cur = df[df['Pillar'].isin(['Robinhood', 'ETRADE', 'Non-US/India'])]['Curr'].sum()
+fire_pct = min(fire_cur / FIRE_TARGET, 1.0)
 
 # --- DASHBOARD ---
-st.title("🔥 FIRE Pulse: Roadmap to Milestones")
+st.title("🔥 FIRE Pulse")
+st.subheader(f"Strategy Dashboard | Net Worth: ${nw:,.0f}")
 
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Total Net Worth", f"${nw:,.0f}", delta=f"${day_p:,.2f} (Latest)")
-col2.metric("FIRE Pillars", f"${fire_current:,.0f}")
-col3.metric("Retirement Assets", f"${ret_val:,.0f}")
-col4.metric("College Fund", f"${col_val:,.0f}")
+col1.metric("Current NW", f"${nw:,.0f}", delta=f"${day_p:,.2f}")
+col2.metric("FIRE Assets", f"${fire_cur:,.0f}")
+col3.metric("Retirement", f"${df[df['Pillar']=='Retirement']['Curr'].sum():,.0f}")
+col4.metric("College Fund", f"${df[df['Pillar']=='College Fund']['Curr'].sum():,.0f}")
 
 st.divider()
-
-# Progress Tracker
-st.subheader(f"FIRE Asset Progress ($1M): {fire_pct:.1%}")
+st.subheader(f"Progress to $1M FIRE Goal: {fire_pct:.1%}")
 st.progress(fire_pct)
-st.caption("Milestone: Robinhood + E*TRADE + India Assets")
 
 st.divider()
-
 c1, c2 = st.columns([1.5, 1])
 with c1:
-    st.subheader("Asset Distribution")
-    pie_df = df[df['Curr_Val'] > 0].groupby('Pillar')['Curr_Val'].sum().reset_index()
-    fig = px.pie(pie_df, values='Curr_Val', names='Pillar', hole=0.5, color_discrete_sequence=px.colors.sequential.Teal)
+    st.subheader("Asset Allocation")
+    fig = px.pie(df[df['Curr'] > 0], values='Curr', names='Pillar', hole=0.5, color_discrete_sequence=px.colors.sequential.Teal)
     fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"))
     st.plotly_chart(fig, use_container_width=True)
-
 with c2:
     st.subheader("Pillar Summary")
     for p in ['Robinhood', 'ETRADE', 'Retirement', 'College Fund', 'Non-US/India']:
-        val = df[df['Pillar'] == p]['Curr_Val'].sum()
-        st.write(f"**{p}**: ${val:,.0f}")
+        st.write(f"**{p}**: ${df[df['Pillar'] == p]['Curr'].sum():,.0f}")
 
 st.divider()
 st.subheader("Asset Ledger")
-st.dataframe(df[['Pillar', 'Name', 'Curr_Val', 'Day_Chg']].sort_values(['Pillar', 'Curr_Val'], ascending=False).style.format({
-    'Curr_Val': '${:,.2f}', 'Day_Chg': '${:,.2f}'
-}), use_container_width=True, hide_index=True)
+st.dataframe(df[['Pillar', 'Name', 'Curr', 'Chg']].sort_values(['Pillar', 'Curr'], ascending=False).style.format({'Curr': '${:,.2f}', 'Chg': '${:,.2f}'}), use_container_width=True, hide_index=True)
