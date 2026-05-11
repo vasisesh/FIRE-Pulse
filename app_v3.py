@@ -30,11 +30,6 @@ st.markdown("""
 # --- 2. CONFIGURATION & TARGETS ---
 FIRE_TARGET = 1000000
 NW_TARGET = 2500000
-RET_AGE = 50
-CUR_AGE = 43
-YEARS_TO_GO = RET_AGE - CUR_AGE
-GROWTH_RATE = 0.07  
-SWR = 0.035         
 
 # --- 3. DYNAMIC VALUE ENGINES ---
 def calculate_dynamic_values():
@@ -47,7 +42,6 @@ def calculate_dynamic_values():
     m_bal = 480000 * (r_h + 1)**h_months - (m_pay / r_h) * ((r_h + 1)**h_months - 1)
     h_val = 600000 * (1 + (1.025**(1/12)-1))**h_months
     
-    # Contributions logic
     biweekly_periods = max(0, (now - datetime(2026, 1, 1)).days // 14)
     total_401k = biweekly_periods * 1269.23
     hsa_p = (24350) + max(0, ((now.year - 2026) * 12 + now.month) * 712.50)
@@ -56,7 +50,7 @@ def calculate_dynamic_values():
 def load_all_data():
     h_val, m_bal, auto_401k, hsa_p = calculate_dynamic_values()
     data = [
-        # PILLAR 1: Robinhood (Full V1 Holdings)
+        # PILLAR 1: Robinhood
         {'Name': 'AAPL', 'Tkr': 'AAPL', 'Qty': 32.875, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'AMD', 'Tkr': 'AMD', 'Qty': 17.228, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'AMZN', 'Tkr': 'AMZN', 'Qty': 6.139, 'Pillar': 'Robinhood', 'Risk': 'High'},
@@ -83,7 +77,7 @@ def load_all_data():
         {'Name': 'VFIAX (ET)', 'Tkr': 'VFIAX', 'Qty': 15.115, 'Pillar': 'ETRADE', 'Risk': 'Mid'},
         {'Name': 'VTIAX (ET)', 'Tkr': 'VTIAX', 'Qty': 225.887, 'Pillar': 'ETRADE', 'Risk': 'Mid'},
         
-        # PILLAR 3: Retirement (V1 Specifics)
+        # PILLAR 3: Retirement
         {'Name': 'VTSAX (Roth IRA)', 'Tkr': 'VTSAX', 'Qty': 3318.528, 'Pillar': 'Retirement', 'Risk': 'Mid'},
         {'Name': 'FELG (Roth IRA)', 'Tkr': 'FELG', 'Qty': 386, 'Pillar': 'Retirement', 'Risk': 'High'},
         {'Name': 'WFSPX (Roth 401k)', 'Tkr': 'WFSPX', 'Qty': 157.092, 'Pillar': 'Retirement', 'Risk': 'Mid'},
@@ -129,20 +123,12 @@ liquid_total = df[df['Pillar'].isin(['Robinhood', 'ETRADE', 'Non-US/India', 'Cas
 high_risk_val = df[df['Risk'] == 'High']['Curr'].sum()
 risk_score = (high_risk_val / liquid_total) * 100
 
-def project_wealth(base, rate):
-    months = YEARS_TO_GO * 12
-    m_rate = (1 + rate)**(1/12) - 1
-    b = [base]
-    for _ in range(months): b.append((b[-1] * (1 + m_rate)) + 3600)
-    return b
-
-projection = project_wealth(liquid_total, GROWTH_RATE)
-final_val = projection[-1]
-monthly_runway = (final_val * SWR) / 12
+fire_progress = min(liquid_total / FIRE_TARGET, 1.0)
+nw_progress = min(nw_curr / NW_TARGET, 1.0)
 
 # --- 5. UI DASHBOARD ---
 st.title("🛡️ THE VASIREDDY FORTRESS V3")
-st.caption(f"Status: Age {CUR_AGE} • Mastery Build • 100% Asset Sync")
+st.caption("Active Mission Tracker • 100% Asset Sync")
 
 m1, m2, m3 = st.columns(3)
 m1.metric("TOTAL NET WORTH", f"${nw_curr:,.0f}", delta=f"${df['Chg_$'].sum():,.2f}")
@@ -151,28 +137,31 @@ m3.metric("TECH CONCENTRATION", f"{risk_score:.1f}%")
 
 st.divider()
 
-# --- RISK GAUGE ---
-st.subheader("PORTFOLIO RISK CLIMATE")
+# --- RISK GAUGE & STRATEGY ---
 g_col, t_col = st.columns([1, 1])
 with g_col:
+    st.subheader("PORTFOLIO RISK CLIMATE")
     fig_gauge = go.Figure(go.Indicator(mode = "gauge+number", value = risk_score,
         gauge = {'bar':{'color': "#00E676"}, 'steps': [{'range': [0, 40], 'color': '#1565C0'}, {'range': [40, 75], 'color': '#FF8F00'}, {'range': [75, 100], 'color': '#C62828'}]}))
     fig_gauge.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, height=280)
     st.plotly_chart(fig_gauge, use_container_width=True)
 with t_col:
-    st.write("### Strategy Insight")
-    st.info(f"Your **${monthly_runway:,.0f}/month** runway (2035) is secured by your diversified pillars. High risk concentration in tech is currently {risk_score:.1f}%.")
+    st.subheader("CORE MISSION PROGRESS")
+    st.write(f"**FIRE Goal ($1.0M Liquid):** {fire_progress:.1%}")
+    st.progress(fire_progress)
+    st.write("")
+    st.write(f"**Net Worth Goal ($2.5M Total):** {nw_progress:.1%}")
+    st.progress(nw_progress)
 
 st.divider()
 
-# --- GROWTH & PILLAR PROGRESS ---
-c1, c2 = st.columns([1.5, 1])
+# --- PILLAR PROGRESS ---
+c1, c2 = st.columns([1, 1])
 with c1:
-    st.subheader(f"Projected Wealth to 2035")
-    fig_path = go.Figure()
-    fig_path.add_trace(go.Scatter(y=projection, fill='tozeroy', line=dict(color='#00E676', width=4)))
-    fig_path.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color="white"), height=350)
-    st.plotly_chart(fig_path, use_container_width=True)
+    st.subheader("Asset Distribution")
+    fig_pie = px.pie(df[df['Curr']>0], values='Curr', names='Pillar', hole=0.6, color_discrete_sequence=px.colors.sequential.Tealgrn)
+    fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, showlegend=False)
+    st.plotly_chart(fig_pie, use_container_width=True)
 with c2:
     st.subheader("Pillar Progress Summaries")
     p_sum = df.groupby('Pillar')['Curr'].sum()
