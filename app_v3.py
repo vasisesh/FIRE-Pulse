@@ -158,7 +158,7 @@ st.caption("Full Asset Inventory • Precision Risk Sync • Obsidian Edition")
 
 m1, m2, m3 = st.columns(3)
 m1.metric("TOTAL NET WORTH", f"${nw_curr:,.0f}", delta=f"${df['Chg_$'].sum():,.2f}")
-m2.metric("LIQUID ASSETS", f"${liquid_total:,.0f}")
+m2.metric("FIRE ASSETS", f"${liquid_total:,.0f}")
 m3.metric("TECH CONCENTRATION", f"{risk_score:.1f}%")
 
 st.divider()
