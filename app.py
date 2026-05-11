@@ -2,134 +2,168 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 import plotly.express as px
-import numpy as np
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
 # --- APP CONFIG ---
 st.set_page_config(page_title="FIRE Pulse", layout="wide")
 
-# --- STYLING ---
+# --- STYLING (High Contrast UI) ---
 st.markdown("""
     <style>
     [data-testid="stMetric"] { background-color: #ffffff; padding: 20px; border-radius: 12px; border: 1px solid #d1d5db; box-shadow: 2px 2px 10px rgba(0,0,0,0.1); }
     [data-testid="stMetricLabel"] { color: #4b5563 !important; font-weight: 600 !important; }
     [data-testid="stMetricValue"] { color: #111827 !important; font-weight: 800 !important; }
+    [data-testid="stMetricDelta"] svg { display: none; }
     .main { background-color: #0e1117; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- CORRECTED MORTGAGE & REAL ESTATE CALCULATOR ---
-def calculate_home_and_debt():
-    # Constants
-    START_DATE = datetime(2022, 4, 1)
-    PURCHASE_PRICE = 600000       # Starting value for appreciation
-    MORTGAGE_START = 480000       # Starting principal for debt
-    ANNUAL_RATE = 0.0299
-    TERM_YEARS = 15
-    ANNUAL_APPRECIATION = 0.025
-    
-    # Time passed
+# --- ENGINE: Mortgage & Real Estate ---
+def calculate_home_equity():
+    start_date = datetime(2022, 4, 1)
+    purchase_price = 600000
+    mortgage_start = 480000
     now = datetime.now()
-    delta = relativedelta(now, START_DATE)
+    delta = relativedelta(now, start_date)
     months_passed = delta.years * 12 + delta.months
     
-    # 1. Calculate Monthly Mortgage Payment (Principal + Interest)
-    r = ANNUAL_RATE / 12
-    n = TERM_YEARS * 12
-    monthly_payment = MORTGAGE_START * (r * (1 + r)**n) / ((1 + r)**n - 1)
+    # Mortgage Balance (2.99%, 15yr)
+    r, n = 0.0299 / 12, 15 * 12
+    m_pay = mortgage_start * (r * (1 + r)**n) / ((1 + r)**n - 1)
+    balance = mortgage_start * (1 + r)**months_passed - (m_pay / r) * ((1 + r)**months_passed - 1)
     
-    # 2. Calculate Current Remaining Balance
-    current_balance = MORTGAGE_START * (1 + r)**months_passed - (monthly_payment / r) * ((1 + r)**months_passed - 1)
-    
-    # 3. Calculate Current House Value (Compounded monthly based on Purchase Price)
-    monthly_growth_rate = (1 + ANNUAL_APPRECIATION)**(1/12) - 1
-    current_house_value = PURCHASE_PRICE * (1 + monthly_growth_rate)**months_passed
-    
-    return round(current_house_value, 2), round(current_balance, 2)
+    # Appreciation (2.5% Annual)
+    growth_rate = (1 + 0.025)**(1/12) - 1
+    current_value = purchase_price * (1 + growth_rate)**months_passed
+    return current_value, balance
 
-# --- DATA ENGINE ---
-def load_and_pulse_data():
-    stocks = {
-        'AAPL': 32.875151, 'AMD': 17.228305, 'AMZN': 6.139473, 'ANET': 6.970517, 
-        'AVGO': 17.692543, 'CRWD': 6.730194, 'DELL': 7.15184, 'DIS': 14.709586, 
-        'ENPH': 10.65757, 'GEV': 1.207569, 'GLD': 3.048105, 'GOOGL': 42.149825, 
-        'JPM': 2.753308, 'META': 8.317115, 'MRVL': 4.209034, 'MSFT': 19.746979, 
-        'NFLX': 77.97709, 'NVDA': 41.067308, 'PANW': 2.468968, 'PLTR': 18.184741, 
-        'SHOP': 42.621966, 'TSLA': 16.669082, 'TSM': 4.457336, 'TTWO': 2.719393, 
-        'UBER': 42.189843, 'VGT': 88.524888, 'VRT': 8.559334, 'CRDO': 8.3776, 
-        'CRWV': 9.0, 'FLEX': 10.0, 'HOOD': 8.0, 'INOD': 17.750223, 'LRCX': 9.22168, 
-        'MU': 6.94118, 'NBIS': 1.0, 'OKLO': 1.184033, 'PSI': 2.491277, 'RDDT': 4.992676, 
-        'SNDK': 4.347362, 'STX': 4.744995, 'WDC': 8.910648
-    }
+# --- ENGINE: Data Aggregator ---
+def load_all_pillars():
+    home_val, m_bal = calculate_home_equity()
     
-    current_house_value, current_mortgage_debt = calculate_home_and_debt()
+    # Define the Pillars
+    data = [
+        # PILLAR 1: Robinhood (Live Tickers)
+        {'Name': 'AAPL', 'Tkr': 'AAPL', 'Qty': 32.875151, 'Pillar': 'Robinhood'},
+        {'Name': 'AMD', 'Tkr': 'AMD', 'Qty': 17.228305, 'Pillar': 'Robinhood'},
+        {'Name': 'AMZN', 'Tkr': 'AMZN', 'Qty': 6.139473, 'Pillar': 'Robinhood'},
+        {'Name': 'ANET', 'Tkr': 'ANET', 'Qty': 6.970517, 'Pillar': 'Robinhood'},
+        {'Name': 'AVGO', 'Tkr': 'AVGO', 'Qty': 17.692543, 'Pillar': 'Robinhood'},
+        {'Name': 'CRWD', 'Tkr': 'CRWD', 'Qty': 6.730194, 'Pillar': 'Robinhood'},
+        {'Name': 'DELL', 'Tkr': 'DELL', 'Qty': 7.15184, 'Pillar': 'Robinhood'},
+        {'Name': 'DIS', 'Tkr': 'DIS', 'Qty': 14.709586, 'Pillar': 'Robinhood'},
+        {'Name': 'ENPH', 'Tkr': 'ENPH', 'Qty': 10.65757, 'Pillar': 'Robinhood'},
+        {'Name': 'GEV', 'Tkr': 'GEV', 'Qty': 1.207569, 'Pillar': 'Robinhood'},
+        {'Name': 'GLD', 'Tkr': 'GLD', 'Qty': 3.048105, 'Pillar': 'Robinhood'},
+        {'Name': 'GOOGL', 'Tkr': 'GOOGL', 'Qty': 42.149825, 'Pillar': 'Robinhood'},
+        {'Name': 'JPM', 'Tkr': 'JPM', 'Qty': 2.753308, 'Pillar': 'Robinhood'},
+        {'Name': 'META', 'Tkr': 'META', 'Qty': 8.317115, 'Pillar': 'Robinhood'},
+        {'Name': 'MRVL', 'Tkr': 'MRVL', 'Qty': 4.209034, 'Pillar': 'Robinhood'},
+        {'Name': 'MSFT', 'Tkr': 'MSFT', 'Qty': 19.746979, 'Pillar': 'Robinhood'},
+        {'Name': 'NFLX', 'Tkr': 'NFLX', 'Qty': 77.97709, 'Pillar': 'Robinhood'},
+        {'Name': 'NVDA', 'Tkr': 'NVDA', 'Qty': 41.067308, 'Pillar': 'Robinhood'},
+        {'Name': 'PANW', 'Tkr': 'PANW', 'Qty': 2.468968, 'Pillar': 'Robinhood'},
+        {'Name': 'PLTR', 'Tkr': 'PLTR', 'Qty': 18.184741, 'Pillar': 'Robinhood'},
+        {'Name': 'SHOP', 'Tkr': 'SHOP', 'Qty': 42.621966, 'Pillar': 'Robinhood'},
+        {'Name': 'TSLA', 'Tkr': 'TSLA', 'Qty': 16.669082, 'Pillar': 'Robinhood'},
+        {'Name': 'TSM', 'Tkr': 'TSM', 'Qty': 4.457336, 'Pillar': 'Robinhood'},
+        {'Name': 'TTWO', 'Tkr': 'TTWO', 'Qty': 2.719393, 'Pillar': 'Robinhood'},
+        {'Name': 'UBER', 'Tkr': 'UBER', 'Qty': 42.189843, 'Pillar': 'Robinhood'},
+        {'Name': 'VGT', 'Tkr': 'VGT', 'Qty': 88.524888, 'Pillar': 'Robinhood'},
+        {'Name': 'VRT', 'Tkr': 'VRT', 'Qty': 8.559334, 'Pillar': 'Robinhood'},
+        {'Name': 'CRDO', 'Tkr': 'CRDO', 'Qty': 8.3776, 'Pillar': 'Robinhood'},
+        {'Name': 'CRWV', 'Tkr': 'CRWV', 'Qty': 9.0, 'Pillar': 'Robinhood'},
+        {'Name': 'FLEX', 'Tkr': 'FLEX', 'Qty': 10.0, 'Pillar': 'Robinhood'},
+        {'Name': 'HOOD', 'Tkr': 'HOOD', 'Qty': 8.0, 'Pillar': 'Robinhood'},
+        {'Name': 'INOD', 'Tkr': 'INOD', 'Qty': 17.750223, 'Pillar': 'Robinhood'},
+        {'Name': 'LRCX', 'Tkr': 'LRCX', 'Qty': 9.22168, 'Pillar': 'Robinhood'},
+        {'Name': 'MU', 'Tkr': 'MU', 'Qty': 6.94118, 'Pillar': 'Robinhood'},
+        {'Name': 'NBIS', 'Tkr': 'NBIS', 'Qty': 1.0, 'Pillar': 'Robinhood'},
+        {'Name': 'OKLO', 'Tkr': 'OKLO', 'Qty': 1.184033, 'Pillar': 'Robinhood'},
+        {'Name': 'PSI', 'Tkr': 'PSI', 'Qty': 2.491277, 'Pillar': 'Robinhood'},
+        {'Name': 'RDDT', 'Tkr': 'RDDT', 'Qty': 4.992676, 'Pillar': 'Robinhood'},
+        {'Name': 'SNDK', 'Tkr': 'SNDK', 'Qty': 4.347362, 'Pillar': 'Robinhood'},
+        {'Name': 'STX', 'Tkr': 'STX', 'Qty': 4.744995, 'Pillar': 'Robinhood'},
+        {'Name': 'WDC', 'Tkr': 'WDC', 'Qty': 8.910648, 'Pillar': 'Robinhood'},
+        {'Name': 'Bitcoin', 'Tkr': 'BTC-USD', 'Qty': 0.06752957, 'Pillar': 'Robinhood'},
+        
+        # PILLAR 2: ETRADE (New Holdings)
+        {'Name': 'Total Stock Market', 'Tkr': 'VTSAX', 'Qty': 1080, 'Pillar': 'ETRADE'},
+        {'Name': 'US Growth Fund', 'Tkr': 'VWUSX', 'Qty': 82.772, 'Pillar': 'ETRADE'},
+        {'Name': 'S&P 500 Index', 'Tkr': 'VFIAX', 'Qty': 15.115, 'Pillar': 'ETRADE'},
+        {'Name': 'International Stock', 'Tkr': 'VTIAX', 'Qty': 225.887, 'Pillar': 'ETRADE'},
+        
+        # PILLAR 3: Retirement (Placeholder for next update)
+        {'Name': 'Retirement Balances', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Retirement', 'Base_Val': 0},
+        
+        # PILLAR 4: College Fund (Placeholder for next update)
+        {'Name': '529 Plans', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'College Fund', 'Base_Val': 0},
+        
+        # PILLAR 5: Non-US/India
+        {'Name': 'International Repatriation', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Non-US/India', 'Base_Val': 300000},
+        
+        # SYSTEM: Real Estate & Debt
+        {'Name': 'Roswell Home', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Real Estate', 'Base_Val': home_val},
+        {'Name': 'Mortgage Debt', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Liability', 'Base_Val': -m_bal}
+    ]
     
-    rows = []
-    for ticker, qty in stocks.items():
-        rows.append({'Name': ticker, 'Ticker': ticker, 'Quantity': qty, 'Category': 'Equity (RH)'})
-    rows.append({'Name': 'Bitcoin', 'Ticker': 'BTC-USD', 'Quantity': 0.06752957, 'Category': 'Crypto'})
-    rows.append({'Name': 'International Holdings', 'Ticker': 'INTL_FLAT', 'Quantity': 1, 'Category': 'International', 'Value': 300000})
-    rows.append({'Name': 'Primary Residence', 'Ticker': 'HOME', 'Quantity': 1, 'Category': 'Real Estate', 'Value': current_house_value})
-    rows.append({'Name': 'Mortgage Debt', 'Ticker': 'DEBT', 'Quantity': 1, 'Category': 'Liability', 'Value': -current_mortgage_debt})
-    
-    df = pd.DataFrame(rows)
-    tickers_to_fetch = list(stocks.keys()) + ['BTC-USD']
+    df = pd.DataFrame(data)
+    tkrs = df[df['Tkr'] != 'FIXED']['Tkr'].unique().tolist()
     
     try:
-        stock_data = yf.download(tickers_to_fetch, period="5d", group_by='ticker', progress=False)
-        def get_p(t):
-            if t in ['INTL_FLAT', 'HOME', 'DEBT']: return 0, 0
-            v_data = stock_data[t]['Close'].dropna()
-            return v_data.iloc[-1], v_data.iloc[-2]
-        df[['Price', 'Prev']] = df.apply(lambda x: pd.Series(get_p(x['Ticker'])), axis=1)
+        prices = yf.download(tkrs, period="2d", group_by='ticker', progress=False)
+        def get_v(r):
+            if r['Tkr'] == 'FIXED': return r['Base_Val'], r['Base_Val']
+            try:
+                valid = prices[r['Tkr']]['Close'].dropna()
+                return valid.iloc[-1] * r['Qty'], valid.iloc[-2] * r['Qty']
+            except: return 0, 0
+        df[['Curr_Val', 'Prev_Val']] = df.apply(lambda x: pd.Series(get_v(x)), axis=1)
     except:
-        df['Price'], df['Prev'] = 0, 0
-        
-    df['Current_Value'] = df.apply(lambda x: x['Value'] if x['Ticker'] in ['INTL_FLAT', 'HOME', 'DEBT'] else x['Price'] * x['Quantity'], axis=1)
-    df['Prev_Value'] = df.apply(lambda x: x['Value'] if x['Ticker'] in ['INTL_FLAT', 'HOME', 'DEBT'] else x['Prev'] * x['Quantity'], axis=1)
-    df['Day_Change'] = (df['Current_Value'] - df['Prev_Value']).fillna(0)
+        df['Curr_Val'] = df['Base_Val'] if 'Base_Val' in df else 0
+        df['Prev_Val'] = df['Curr_Val']
+
+    df['Day_Chg'] = (df['Curr_Val'] - df['Prev_Val']).fillna(0)
     return df
 
-df = load_and_pulse_data()
+df = load_all_pillars()
 
-# --- CALCULATIONS ---
-total_nw = df['Current_Value'].sum()
-day_change = df['Day_Change'].sum()
-fire_fund = df[~df['Category'].isin(['Real Estate', 'Liability'])]['Current_Value'].sum()
-current_val = df[df['Ticker']=='HOME']['Current_Value'].values[0]
-current_debt = abs(df[df['Ticker']=='DEBT']['Current_Value'].values[0])
-home_equity = current_val - current_debt
+# --- DASHBOARD LAYOUT ---
+st.title("🔥 FIRE Pulse: The Five Pillars")
 
-# --- DASHBOARD ---
-st.title("🔥 FIRE Pulse")
-st.subheader("Roswell Real Estate & Portfolio Tracker")
+# Metrics
+nw = df['Curr_Val'].sum()
+day_p = df['Day_Chg'].sum()
+fire_f = df[df['Pillar'].isin(['Robinhood', 'ETRADE', 'Retirement'])]['Curr_Val'].sum()
+h_equity = df[df['Pillar'] == 'Real Estate']['Curr_Val'].sum() + df[df['Pillar'] == 'Liability']['Curr_Val'].sum()
 
 m1, m2, m3, m4 = st.columns(4)
-m1.metric("Total Net Worth", f"${total_nw:,.0f}", delta=f"${day_change:,.2f} Today")
-m2.metric("FIRE Fund Status", f"${fire_fund:,.0f}")
-m3.metric("Home Equity", f"${home_equity:,.0f}")
-m4.metric("Mortgage Balance", f"${current_debt:,.0f}")
+m1.metric("Net Worth", f"${nw:,.0f}", delta=f"${day_p:,.2f} Today")
+m2.metric("FIRE Pillars", f"${fire_f:,.0f}")
+m3.metric("Home Equity", f"${h_equity:,.0f}")
+m4.metric("Non-US Assets", f"${df[df['Pillar']=='Non-US/India']['Curr_Val'].sum():,.0f}")
 
 st.divider()
 
-c_left, c_right = st.columns([1.5, 1])
-with c_left:
-    st.subheader("Asset Allocation")
-    pie_df = df[df['Category'] != 'Liability'].copy()
-    fig = px.pie(pie_df, values='Current_Value', names='Category', hole=0.5, color_discrete_sequence=px.colors.sequential.Teal)
+c1, c2 = st.columns([1.5, 1])
+with c1:
+    st.subheader("Asset Allocation by Pillar")
+    pie_df = df[df['Curr_Val'] > 0].groupby('Pillar')['Curr_Val'].sum().reset_index()
+    fig = px.pie(pie_df, values='Curr_Val', names='Pillar', hole=0.5, color_discrete_sequence=px.colors.sequential.Teal)
     fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"))
     st.plotly_chart(fig, use_container_width=True)
 
-with c_right:
-    st.subheader("Home Equity Pulse")
-    st.write(f"**Estimated Value:** ${current_val:,.0f}")
-    st.write(f"**Mortgage Principal:** ${current_debt:,.0f}")
-    st.progress(home_equity / current_val)
-    st.caption(f"Equity: **{home_equity / current_val:.1%}** | Debt: **{current_debt / current_val:.1%}**")
+with c2:
+    st.subheader("Pillar Pulse")
+    p_summary = df.groupby('Pillar')['Curr_Val'].sum()
+    for p in ['Robinhood', 'ETRADE', 'Non-US/India', 'Real Estate']:
+        st.write(f"**{p}**")
+        st.caption(f"${p_summary.get(p, 0):,.0f}")
+        st.progress(min(p_summary.get(p, 0) / 1000000, 1.0))
 
 st.divider()
-st.subheader("Net Worth Breakdown")
-st.dataframe(df[['Name', 'Category', 'Current_Value', 'Day_Change']].sort_values('Current_Value', ascending=False).style.format({
-    'Current_Value': '${:,.2f}', 'Day_Change': '${:,.2f}'
+st.subheader("Master Ledger")
+st.dataframe(df[['Pillar', 'Name', 'Curr_Val', 'Day_Chg']].sort_values(['Pillar', 'Curr_Val'], ascending=False).style.format({
+    'Curr_Val': '${:,.2f}', 'Day_Chg': '${:,.2f}'
 }), use_container_width=True, hide_index=True)
