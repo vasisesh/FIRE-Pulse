@@ -50,41 +50,32 @@ def calculate_dynamic_values():
     # Contributions logic
     biweekly_periods = max(0, (now - datetime(2026, 1, 1)).days // 14)
     total_401k = biweekly_periods * 1269.23
-    hsa_p = (7750 + 8300 + 8300) + max(0, ((now.year - 2026) * 12 + now.month) * 712.50)
+    hsa_p = (24350) + max(0, ((now.year - 2026) * 12 + now.month) * 712.50)
     return h_val, m_bal, total_401k, hsa_p
 
 def load_all_data():
     h_val, m_bal, auto_401k, hsa_p = calculate_dynamic_values()
     data = [
-        # PILLAR 1: Robinhood
-        {'Name': 'AAPL', 'Tkr': 'AAPL', 'Qty': 32.875151, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'AMD', 'Tkr': 'AMD', 'Qty': 17.228305, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'AMZN', 'Tkr': 'AMZN', 'Qty': 6.139473, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'ANET', 'Tkr': 'ANET', 'Qty': 6.970517, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'AVGO', 'Tkr': 'AVGO', 'Qty': 17.692543, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'CRWD', 'Tkr': 'CRWD', 'Qty': 6.730194, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'DELL', 'Tkr': 'DELL', 'Qty': 7.15184, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'DIS', 'Tkr': 'DIS', 'Qty': 14.709586, 'Pillar': 'Robinhood', 'Risk': 'Mid'},
-        {'Name': 'ENPH', 'Tkr': 'ENPH', 'Qty': 10.65757, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'GEV', 'Tkr': 'GEV', 'Qty': 1.207569, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'GLD', 'Tkr': 'GLD', 'Qty': 3.048105, 'Pillar': 'Robinhood', 'Risk': 'Low'},
-        {'Name': 'GOOGL', 'Tkr': 'GOOGL', 'Qty': 42.149825, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'JPM', 'Tkr': 'JPM', 'Qty': 2.753308, 'Pillar': 'Robinhood', 'Risk': 'Mid'},
-        {'Name': 'META', 'Tkr': 'META', 'Qty': 8.317115, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'MRVL', 'Tkr': 'MRVL', 'Qty': 4.209034, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'MSFT', 'Tkr': 'MSFT', 'Qty': 19.746979, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'NFLX', 'Tkr': 'NFLX', 'Qty': 77.97709, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'NVDA', 'Tkr': 'NVDA', 'Qty': 41.067308, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'PANW', 'Tkr': 'PANW', 'Qty': 2.468968, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'PLTR', 'Tkr': 'PLTR', 'Qty': 18.184741, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'SHOP', 'Tkr': 'SHOP', 'Qty': 42.621966, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'TSLA', 'Tkr': 'TSLA', 'Qty': 16.669082, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'TSM', 'Tkr': 'TSM', 'Qty': 4.457336, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'TTWO', 'Tkr': 'TTWO', 'Qty': 2.719393, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'UBER', 'Tkr': 'UBER', 'Qty': 42.189843, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'VGT', 'Tkr': 'VGT', 'Qty': 88.524888, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'VRT', 'Tkr': 'VRT', 'Qty': 8.559334, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'Bitcoin', 'Tkr': 'BTC-USD', 'Qty': 0.06752957, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        # PILLAR 1: Robinhood (Full V1 Holdings)
+        {'Name': 'AAPL', 'Tkr': 'AAPL', 'Qty': 32.875, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'AMD', 'Tkr': 'AMD', 'Qty': 17.228, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'AMZN', 'Tkr': 'AMZN', 'Qty': 6.139, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'ANET', 'Tkr': 'ANET', 'Qty': 6.970, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'AVGO', 'Tkr': 'AVGO', 'Qty': 17.692, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'CRWD', 'Tkr': 'CRWD', 'Qty': 6.730, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'DELL', 'Tkr': 'DELL', 'Qty': 7.151, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'DIS', 'Tkr': 'DIS', 'Qty': 14.709, 'Pillar': 'Robinhood', 'Risk': 'Mid'},
+        {'Name': 'ENPH', 'Tkr': 'ENPH', 'Qty': 10.657, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'GOOGL', 'Tkr': 'GOOGL', 'Qty': 42.149, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'META', 'Tkr': 'META', 'Qty': 8.317, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'MSFT', 'Tkr': 'MSFT', 'Qty': 19.746, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'NFLX', 'Tkr': 'NFLX', 'Qty': 77.977, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'NVDA', 'Tkr': 'NVDA', 'Qty': 41.067, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'PLTR', 'Tkr': 'PLTR', 'Qty': 18.184, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'SHOP', 'Tkr': 'SHOP', 'Qty': 42.621, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'TSLA', 'Tkr': 'TSLA', 'Qty': 16.669, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'VGT', 'Tkr': 'VGT', 'Qty': 88.524, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'Bitcoin', 'Tkr': 'BTC-USD', 'Qty': 0.067, 'Pillar': 'Robinhood', 'Risk': 'High'},
         
         # PILLAR 2: ETRADE
         {'Name': 'VTSAX (ET)', 'Tkr': 'VTSAX', 'Qty': 1080, 'Pillar': 'ETRADE', 'Risk': 'Mid'},
@@ -92,13 +83,20 @@ def load_all_data():
         {'Name': 'VFIAX (ET)', 'Tkr': 'VFIAX', 'Qty': 15.115, 'Pillar': 'ETRADE', 'Risk': 'Mid'},
         {'Name': 'VTIAX (ET)', 'Tkr': 'VTIAX', 'Qty': 225.887, 'Pillar': 'ETRADE', 'Risk': 'Mid'},
         
-        # PILLAR 3: Retirement
+        # PILLAR 3: Retirement (V1 Specifics)
         {'Name': 'VTSAX (Roth IRA)', 'Tkr': 'VTSAX', 'Qty': 3318.528, 'Pillar': 'Retirement', 'Risk': 'Mid'},
-        {'Name': 'Auto 401k Growth', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Retirement', 'Base': auto_401k, 'Risk': 'Mid'},
+        {'Name': 'FELG (Roth IRA)', 'Tkr': 'FELG', 'Qty': 386, 'Pillar': 'Retirement', 'Risk': 'High'},
+        {'Name': 'WFSPX (Roth 401k)', 'Tkr': 'WFSPX', 'Qty': 157.092, 'Pillar': 'Retirement', 'Risk': 'Mid'},
+        {'Name': 'JLGMX (Roth 401k)', 'Tkr': 'JLGMX', 'Qty': 641.562, 'Pillar': 'Retirement', 'Risk': 'High'},
+        {'Name': 'Auto 401k Contribution', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Retirement', 'Base': auto_401k, 'Risk': 'Mid'},
+        
+        # PILLAR 4: College Fund
+        {'Name': 'VTSAX (College)', 'Tkr': 'VTSAX', 'Qty': 209.296, 'Pillar': 'College Fund', 'Risk': 'Mid'},
+        {'Name': 'VTI (College)', 'Tkr': 'VTI', 'Qty': 222.203, 'Pillar': 'College Fund', 'Risk': 'Mid'},
         
         # PILLAR 5: Non-US/India & HSA
         {'Name': 'India Assets', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Non-US/India', 'Base': 300000, 'Risk': 'Low'},
-        {'Name': 'HSA (VTSAX)', 'Tkr': 'VTSAX', 'Qty': (hsa_p / 120), 'Pillar': 'Non-US/India', 'Risk': 'Mid'},
+        {'Name': 'HSA (Invested)', 'Tkr': 'VTSAX', 'Qty': (hsa_p / 120), 'Pillar': 'Non-US/India', 'Risk': 'Mid'},
         
         # PILLAR 6: Cash
         {'Name': 'HYSA Savings', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Cash', 'Base': 40000, 'Risk': 'Low'},
@@ -125,7 +123,7 @@ def load_all_data():
 
 df = load_all_data()
 
-# --- 4. CALCULATIONS & FORECASTS ---
+# --- 4. CALCULATIONS ---
 nw_curr = df['Curr'].sum()
 liquid_total = df[df['Pillar'].isin(['Robinhood', 'ETRADE', 'Non-US/India', 'Cash'])]['Curr'].sum()
 high_risk_val = df[df['Risk'] == 'High']['Curr'].sum()
@@ -144,7 +142,7 @@ monthly_runway = (final_val * SWR) / 12
 
 # --- 5. UI DASHBOARD ---
 st.title("🛡️ THE VASIREDDY FORTRESS V3")
-st.caption(f"Status: Age {CUR_AGE} • Target: Age {RET_AGE} (2035) • Combined Sync")
+st.caption(f"Status: Age {CUR_AGE} • Mastery Build • 100% Asset Sync")
 
 m1, m2, m3 = st.columns(3)
 m1.metric("TOTAL NET WORTH", f"${nw_curr:,.0f}", delta=f"${df['Chg_$'].sum():,.2f}")
@@ -153,7 +151,7 @@ m3.metric("TECH CONCENTRATION", f"{risk_score:.1f}%")
 
 st.divider()
 
-# --- RISK GAUGE SECTION ---
+# --- RISK GAUGE ---
 st.subheader("PORTFOLIO RISK CLIMATE")
 g_col, t_col = st.columns([1, 1])
 with g_col:
@@ -163,11 +161,11 @@ with g_col:
     st.plotly_chart(fig_gauge, use_container_width=True)
 with t_col:
     st.write("### Strategy Insight")
-    st.info(f"Your **${monthly_runway:,.0f}/month** runway (2035) is supported by a tech-heavy engine. Ensure your 'Cooling Assets' (India/Cash) cover at least 2 years of expenses.")
+    st.info(f"Your **${monthly_runway:,.0f}/month** runway (2035) is secured by your diversified pillars. High risk concentration in tech is currently {risk_score:.1f}%.")
 
 st.divider()
 
-# --- GROWTH & PILLARS ---
+# --- GROWTH & PILLAR PROGRESS ---
 c1, c2 = st.columns([1.5, 1])
 with c1:
     st.subheader(f"Projected Wealth to 2035")
@@ -176,12 +174,9 @@ with c1:
     fig_path.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color="white"), height=350)
     st.plotly_chart(fig_path, use_container_width=True)
 with c2:
-    st.subheader("Asset Pillars")
-    fig_pie = px.pie(df[df['Curr']>0], values='Curr', names='Pillar', hole=0.6, color_discrete_sequence=px.colors.sequential.Tealgrn)
-    fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"), showlegend=False)
-    st.plotly_chart(fig_pie, use_container_width=True)
+    st.subheader("Pillar Progress Summaries")
     p_sum = df.groupby('Pillar')['Curr'].sum()
-    for p in ['Robinhood', 'ETRADE', 'Retirement', 'Non-US/India', 'Cash']:
+    for p in ['Robinhood', 'ETRADE', 'Retirement', 'College Fund', 'Non-US/India', 'Cash']:
         val = p_sum.get(p, 0)
         st.markdown(f"**{p}** <span style='float:right; color:#00E676;'>${val:,.0f}</span>", unsafe_allow_html=True)
         st.progress(min(val/1200000, 1.0))
@@ -190,28 +185,18 @@ st.divider()
 
 # --- ROBINHOOD TOP 10 ---
 rh_df = df[df['Pillar'] == 'Robinhood'].copy()
-rh_total = rh_df['Curr'].sum()
-rh_df['Port_%'] = (rh_df['Curr'] / rh_total) * 100
 top_10 = rh_df.sort_values('Curr', ascending=False).head(10)
-
 st.subheader("ROBINHOOD TOP 10 CONCENTRATION")
-t10_col_chart, t10_col_table = st.columns([1.5, 1])
-with t10_col_chart:
-    fig_rh = px.bar(top_10, x='Name', y='Curr', text_auto='.2s', color='Curr', color_continuous_scale='tealgrn')
-    fig_rh.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color="#B0B0B0"), coloraxis_showscale=False)
-    st.plotly_chart(fig_rh, use_container_width=True)
-with t10_col_table:
-    st.write("**Top 10 Asset Detail**")
-    st.dataframe(top_10[['Name', 'Curr', 'Port_%']].style.format({'Curr': '${:,.0f}', 'Port_%': '{:.2f}%'}), use_container_width=True, hide_index=True)
+st.dataframe(top_10[['Name', 'Curr', 'Risk']].style.format({'Curr': '${:,.0f}'}), use_container_width=True, hide_index=True)
 
 st.divider()
 
 # --- MASTER LEDGER ---
 st.subheader("MASTER ASSET LEDGER")
-def style_ledger(val):
-    if isinstance(val, (int, float)):
-        if val > 0: return 'color: #00E676'
-        elif val < 0: return 'color: #FF5252'
+def style_ledger(v):
+    if isinstance(v, (int, float)):
+        if v > 0: return 'color: #00E676'
+        elif v < 0: return 'color: #FF5252'
     return 'color: #E0E0E0'
 
 st.dataframe(
