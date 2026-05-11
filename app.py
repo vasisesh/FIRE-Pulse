@@ -135,19 +135,23 @@ def load_all_pillars():
 df = load_all_pillars()
 
 # --- CALCULATIONS ---
-nw = df['Curr'].sum()
-day_p = df['Chg_$'].sum()
+nw_curr = df['Curr'].sum()
+nw_prev = df['Prev'].sum()
+nw_chg_dollar = nw_curr - nw_prev
+nw_chg_pct = (nw_chg_dollar / nw_prev) * 100
+
 fire_cur = df[df['Pillar'].isin(['Robinhood', 'ETRADE', 'Non-US/India', 'Cash'])]['Curr'].sum()
 fire_pct = min(fire_cur / FIRE_TARGET, 1.0)
-nw_pct = min(nw / NW_TARGET, 1.0)
+nw_goal_pct = min(nw_curr / NW_TARGET, 1.0)
 
 # --- DASHBOARD ---
 st.title("🔥 FIRE Pulse")
 
 col1, col2, col3 = st.columns(3)
-col1.metric("Total Net Worth", f"${nw:,.0f}", delta=f"${day_p:,.2f}")
+# Updated Metric with Percentage Ticker
+col1.metric("Total Net Worth", f"${nw_curr:,.0f}", delta=f"${nw_chg_dollar:,.2f} ({nw_chg_pct:.2f}%)")
 col2.metric("FIRE Asset Value", f"${fire_cur:,.0f}")
-col3.metric("Gap to $2.5M", f"${max(0, NW_TARGET - nw):,.0f}")
+col3.metric("Gap to $2.5M", f"${max(0, NW_TARGET - nw_curr):,.0f}")
 
 st.divider()
 
@@ -157,8 +161,8 @@ with prog_col1:
     st.subheader(f"FIRE Goal ($1M): {fire_pct:.1%}")
     st.progress(fire_pct)
 with prog_col2:
-    st.subheader(f"Net Worth Goal ($2.5M): {nw_pct:.1%}")
-    st.progress(nw_pct)
+    st.subheader(f"Net Worth Goal ($2.5M): {nw_goal_pct:.1%}")
+    st.progress(nw_goal_pct)
 
 st.divider()
 
@@ -166,15 +170,15 @@ st.divider()
 charts_left, summary_right = st.columns([1.5, 1])
 with charts_left:
     st.subheader("Asset Allocation by Pillar")
-    # Using 'teal' color scale for consistency
     fig_pie = px.pie(df[df['Curr'] > 0], values='Curr', names='Pillar', hole=0.5, color_discrete_sequence=px.colors.sequential.Teal)
     fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"))
     st.plotly_chart(fig_pie, use_container_width=True)
 
 with summary_right:
     st.subheader("Pillar Summary")
+    p_summary = df.groupby('Pillar')['Curr'].sum()
     for p in ['Robinhood', 'ETRADE', 'Retirement', 'College Fund', 'Non-US/India', 'Cash', 'Real Estate']:
-        val = df[df['Pillar'] == p]['Curr'].sum()
+        val = p_summary.get(p, 0)
         st.write(f"**{p}**: ${val:,.0f}")
 
 st.divider()
