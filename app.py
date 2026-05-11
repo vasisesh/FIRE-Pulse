@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 import plotly.express as px
+import numpy as np
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
 # --- APP CONFIG ---
 st.set_page_config(page_title="FIRE Pulse", layout="wide")
@@ -10,23 +12,41 @@ st.set_page_config(page_title="FIRE Pulse", layout="wide")
 # --- STYLING ---
 st.markdown("""
     <style>
-    [data-testid="stMetric"] {
-        background-color: #ffffff;
-        padding: 20px;
-        border-radius: 12px;
-        border: 1px solid #d1d5db;
-        box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
-    }
+    [data-testid="stMetric"] { background-color: #ffffff; padding: 20px; border-radius: 12px; border: 1px solid #d1d5db; box-shadow: 2px 2px 10px rgba(0,0,0,0.1); }
     [data-testid="stMetricLabel"] { color: #4b5563 !important; font-weight: 600 !important; }
     [data-testid="stMetricValue"] { color: #111827 !important; font-weight: 800 !important; }
-    [data-testid="stMetricDelta"] svg { display: none; }
     .main { background-color: #0e1117; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- CONSTANTS ---
-TARGET_FIRE_FUND = 500000
-TARGET_YEAR = 2030
+# --- CORRECTED MORTGAGE & REAL ESTATE CALCULATOR ---
+def calculate_home_and_debt():
+    # Constants
+    START_DATE = datetime(2022, 4, 1)
+    PURCHASE_PRICE = 600000       # Starting value for appreciation
+    MORTGAGE_START = 480000       # Starting principal for debt
+    ANNUAL_RATE = 0.0299
+    TERM_YEARS = 15
+    ANNUAL_APPRECIATION = 0.025
+    
+    # Time passed
+    now = datetime.now()
+    delta = relativedelta(now, START_DATE)
+    months_passed = delta.years * 12 + delta.months
+    
+    # 1. Calculate Monthly Mortgage Payment (Principal + Interest)
+    r = ANNUAL_RATE / 12
+    n = TERM_YEARS * 12
+    monthly_payment = MORTGAGE_START * (r * (1 + r)**n) / ((1 + r)**n - 1)
+    
+    # 2. Calculate Current Remaining Balance
+    current_balance = MORTGAGE_START * (1 + r)**months_passed - (monthly_payment / r) * ((1 + r)**months_passed - 1)
+    
+    # 3. Calculate Current House Value (Compounded monthly based on Purchase Price)
+    monthly_growth_rate = (1 + ANNUAL_APPRECIATION)**(1/12) - 1
+    current_house_value = PURCHASE_PRICE * (1 + monthly_growth_rate)**months_passed
+    
+    return round(current_house_value, 2), round(current_balance, 2)
 
 # --- DATA ENGINE ---
 def load_and_pulse_data():
@@ -43,92 +63,73 @@ def load_and_pulse_data():
         'SNDK': 4.347362, 'STX': 4.744995, 'WDC': 8.910648
     }
     
+    current_house_value, current_mortgage_debt = calculate_home_and_debt()
+    
     rows = []
     for ticker, qty in stocks.items():
-        rows.append({'Name': ticker, 'Ticker': ticker, 'Quantity': qty, 'Category': 'Equity (RH)', 'Base_Value': 0})
-    rows.append({'Name': 'Bitcoin', 'Ticker': 'BTC-USD', 'Quantity': 0.06752957, 'Category': 'Crypto', 'Base_Value': 0})
-    rows.append({'Name': 'International Holdings', 'Ticker': 'INTL_FLAT', 'Quantity': 1, 'Category': 'International', 'Base_Value': 300000})
-    rows.append({'Name': 'Primary Residence', 'Ticker': 'HOME', 'Quantity': 1, 'Category': 'Real Estate', 'Base_Value': 600000})
+        rows.append({'Name': ticker, 'Ticker': ticker, 'Quantity': qty, 'Category': 'Equity (RH)'})
+    rows.append({'Name': 'Bitcoin', 'Ticker': 'BTC-USD', 'Quantity': 0.06752957, 'Category': 'Crypto'})
+    rows.append({'Name': 'International Holdings', 'Ticker': 'INTL_FLAT', 'Quantity': 1, 'Category': 'International', 'Value': 300000})
+    rows.append({'Name': 'Primary Residence', 'Ticker': 'HOME', 'Quantity': 1, 'Category': 'Real Estate', 'Value': current_house_value})
+    rows.append({'Name': 'Mortgage Debt', 'Ticker': 'DEBT', 'Quantity': 1, 'Category': 'Liability', 'Value': -current_mortgage_debt})
     
     df = pd.DataFrame(rows)
     tickers_to_fetch = list(stocks.keys()) + ['BTC-USD']
     
     try:
-        # Fetch 5 days to ensure we bridge the weekend
         stock_data = yf.download(tickers_to_fetch, period="5d", group_by='ticker', progress=False)
-        
-        def get_valid_prices(ticker):
-            if ticker in ['INTL_FLAT', 'HOME']:
-                v = df.loc[df['Ticker']==ticker, 'Base_Value'].values[0]
-                return v, v
-            try:
-                # This grabs only non-empty price rows
-                valid_closes = stock_data[ticker]['Close'].dropna()
-                # Most recent price (Friday 4/5 PM if it's the weekend)
-                current = valid_closes.iloc[-1]
-                # Price before that (Thursday close if it's the weekend)
-                prev = valid_closes.iloc[-2]
-                return current, prev
-            except:
-                return 0, 0
-
-        df[['Price', 'Prev_Price']] = df.apply(lambda x: pd.Series(get_valid_prices(x['Ticker'])), axis=1)
+        def get_p(t):
+            if t in ['INTL_FLAT', 'HOME', 'DEBT']: return 0, 0
+            v_data = stock_data[t]['Close'].dropna()
+            return v_data.iloc[-1], v_data.iloc[-2]
+        df[['Price', 'Prev']] = df.apply(lambda x: pd.Series(get_p(x['Ticker'])), axis=1)
     except:
-        df['Price'] = 0
-        df['Prev_Price'] = 0
+        df['Price'], df['Prev'] = 0, 0
         
-    df['Current_Value'] = df['Price'] * df['Quantity']
-    df['Prev_Value'] = df['Prev_Price'] * df['Quantity']
-    
-    # Overwrite flat assets
-    df.loc[df['Ticker'].isin(['INTL_FLAT', 'HOME']), ['Current_Value', 'Prev_Value']] = df['Base_Value']
-    
-    # Final cleanup to prevent NaNs
-    df['Day_Change_Dollar'] = (df['Current_Value'] - df['Prev_Value']).fillna(0)
+    df['Current_Value'] = df.apply(lambda x: x['Value'] if x['Ticker'] in ['INTL_FLAT', 'HOME', 'DEBT'] else x['Price'] * x['Quantity'], axis=1)
+    df['Prev_Value'] = df.apply(lambda x: x['Value'] if x['Ticker'] in ['INTL_FLAT', 'HOME', 'DEBT'] else x['Prev'] * x['Quantity'], axis=1)
+    df['Day_Change'] = (df['Current_Value'] - df['Prev_Value']).fillna(0)
     return df
 
 df = load_and_pulse_data()
 
 # --- CALCULATIONS ---
 total_nw = df['Current_Value'].sum()
-total_day_change = df['Day_Change_Dollar'].sum()
-fire_fund_current = df[df['Ticker'] != 'HOME']['Current_Value'].sum()
-fire_progress = (fire_fund_current / TARGET_FIRE_FUND) * 100
+day_change = df['Day_Change'].sum()
+fire_fund = df[~df['Category'].isin(['Real Estate', 'Liability'])]['Current_Value'].sum()
+current_val = df[df['Ticker']=='HOME']['Current_Value'].values[0]
+current_debt = abs(df[df['Ticker']=='DEBT']['Current_Value'].values[0])
+home_equity = current_val - current_debt
 
-# --- DASHBOARD UI ---
+# --- DASHBOARD ---
 st.title("🔥 FIRE Pulse")
-st.subheader(f"Strategy Roadmap | Goal: ${TARGET_FIRE_FUND:,.0f} by {TARGET_YEAR}")
+st.subheader("Roswell Real Estate & Portfolio Tracker")
 
 m1, m2, m3, m4 = st.columns(4)
-m1.metric("Total Net Worth", f"${total_nw:,.0f}", delta=f"${total_day_change:,.2f} (Latest Change)")
-m2.metric("FIRE Fund Status", f"${fire_fund_current:,.0f}")
-m3.metric("Goal Progress", f"{fire_progress:.1f}%")
-m4.metric("Assets Tracked", len(df))
+m1.metric("Total Net Worth", f"${total_nw:,.0f}", delta=f"${day_change:,.2f} Today")
+m2.metric("FIRE Fund Status", f"${fire_fund:,.0f}")
+m3.metric("Home Equity", f"${home_equity:,.0f}")
+m4.metric("Mortgage Balance", f"${current_debt:,.0f}")
 
 st.divider()
 
-col_left, col_right = st.columns([1.5, 1])
-
-with col_left:
+c_left, c_right = st.columns([1.5, 1])
+with c_left:
     st.subheader("Asset Allocation")
-    fig = px.pie(df, values='Current_Value', names='Category', hole=0.5, color_discrete_sequence=px.colors.sequential.Teal)
+    pie_df = df[df['Category'] != 'Liability'].copy()
+    fig = px.pie(pie_df, values='Current_Value', names='Category', hole=0.5, color_discrete_sequence=px.colors.sequential.Teal)
     fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"))
     st.plotly_chart(fig, use_container_width=True)
 
-with col_right:
-    st.subheader("Latest Pulse")
-    pulse_df = df[df['Day_Change_Dollar'] != 0].sort_values('Day_Change_Dollar', key=abs, ascending=False).head(10)
-    
-    if not pulse_df.empty:
-        for _, row in pulse_df.iterrows():
-            color = "#28a745" if row['Day_Change_Dollar'] > 0 else "#dc3545"
-            st.markdown(f"**{row['Name']}**: <span style='color:{color}'>${row['Day_Change_Dollar']:,.2f}</span>", unsafe_allow_html=True)
-    else:
-        st.info("No significant price changes recorded recently.")
+with c_right:
+    st.subheader("Home Equity Pulse")
+    st.write(f"**Estimated Value:** ${current_val:,.0f}")
+    st.write(f"**Mortgage Principal:** ${current_debt:,.0f}")
+    st.progress(home_equity / current_val)
+    st.caption(f"Equity: **{home_equity / current_val:.1%}** | Debt: **{current_debt / current_val:.1%}**")
 
 st.divider()
-
-st.subheader("Holdings Breakdown")
-st.dataframe(df[['Name', 'Category', 'Quantity', 'Price', 'Current_Value', 'Day_Change_Dollar']].sort_values('Current_Value', ascending=False).style.format({
-    'Price': '${:,.2f}', 'Current_Value': '${:,.2f}', 'Day_Change_Dollar': '${:,.2f}'
+st.subheader("Net Worth Breakdown")
+st.dataframe(df[['Name', 'Category', 'Current_Value', 'Day_Change']].sort_values('Current_Value', ascending=False).style.format({
+    'Current_Value': '${:,.2f}', 'Day_Change': '${:,.2f}'
 }), use_container_width=True, hide_index=True)
