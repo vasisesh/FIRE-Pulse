@@ -33,10 +33,13 @@ def calculate_dynamic_values():
     m_pay = 480000 * (r_h * (1 + r_h)**n_h) / ((1 + r_h)**n_h - 1)
     m_bal = 480000 * (r_h + 1)**h_months - (m_pay / r_h) * ((r_h + 1)**h_months - 1)
     h_val = 600000 * (1 + (1.025**(1/12)-1))**h_months
+    
+    # 401k Growth Engine ($33k/year total)
     c_start = datetime(2026, 1, 1)
     days_passed = (now - c_start).days
     biweekly_periods = max(0, days_passed // 14)
     total_contributions = biweekly_periods * 1269.23
+    
     return h_val, m_bal, total_contributions
 
 def load_all_pillars():
@@ -127,7 +130,6 @@ def load_all_pillars():
         df['Prev'] = df['Curr']
     
     df['Chg_$'] = (df['Curr'] - df['Prev']).fillna(0)
-    # NEW: Calculate % Change
     df['Chg_%'] = ((df['Curr'] / df['Prev'] - 1) * 100).fillna(0)
     return df
 
@@ -176,11 +178,11 @@ with summary_right:
 st.divider()
 st.subheader("Full Ledger (Daily Movement)")
 
-# NEW: Formatting the Ledger with % Change and Color Coding
 def color_change(val):
     color = '#28a745' if val > 0 else '#dc3545' if val < 0 else 'white'
     return f'color: {color}'
 
+# FIX: Using .map instead of .applymap for compatibility
 st.dataframe(
     df[['Pillar', 'Name', 'Curr', 'Chg_$', 'Chg_%']]
     .sort_values(['Pillar', 'Curr'], ascending=False)
@@ -189,7 +191,7 @@ st.dataframe(
         'Chg_$': '${:,.2f}', 
         'Chg_%': '{:,.2f}%'
     })
-    .applymap(color_change, subset=['Chg_$', 'Chg_%']), 
+    .map(color_change, subset=['Chg_$', 'Chg_%']), 
     use_container_width=True, 
     hide_index=True
 )
