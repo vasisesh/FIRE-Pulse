@@ -8,7 +8,7 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
 # --- 1. APP CONFIG & OBSIDIAN UI ---
-st.set_page_config(page_title="FIRE Pulse V2.4", layout="wide")
+st.set_page_config(page_title="FIRE Pulse V2.4 Mastery", layout="wide")
 
 st.markdown("""
     <style>
@@ -60,11 +60,12 @@ def load_all_data():
         {'Name': 'NVDA', 'Tkr': 'NVDA', 'Qty': 41.067, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'VGT', 'Tkr': 'VGT', 'Qty': 88.524, 'Pillar': 'Robinhood', 'Risk': 'High'},
         {'Name': 'Bitcoin', 'Tkr': 'BTC-USD', 'Qty': 0.0675, 'Pillar': 'Robinhood', 'Risk': 'High'},
-        {'Name': 'AMD', 'Tkr': 'AMD', 'Qty': 17.228, 'Pillar': 'Robinhood', 'Risk': 'High'},
+        {'Name': 'NFLX', 'Tkr': 'NFLX', 'Qty': 77.977, 'Pillar': 'Robinhood', 'Risk': 'High'},
         # PILLAR 2: ETRADE (Mid Risk)
         {'Name': 'VTSAX (ET)', 'Tkr': 'VTSAX', 'Qty': 1080, 'Pillar': 'ETRADE', 'Risk': 'Mid'},
         # PILLAR 3: Retirement
         {'Name': 'VTSAX (Roth IRA)', 'Tkr': 'VTSAX', 'Qty': 3318.528, 'Pillar': 'Retirement', 'Risk': 'Mid'},
+        {'Name': 'WFSPX (401k)', 'Tkr': 'WFSPX', 'Qty': 157.092, 'Pillar': 'Retirement', 'Risk': 'Mid'},
         {'Name': 'Auto 401k', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Retirement', 'Base': auto_401k, 'Risk': 'Mid'},
         # PILLAR 5: Non-US/India & HSA (Low Risk)
         {'Name': 'India Assets', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Non-US/India', 'Base': 300000, 'Risk': 'Low'},
@@ -87,6 +88,7 @@ def load_all_data():
     except:
         df['Curr'] = df.get('Base', 0); df['Prev'] = df['Curr']
     df['Chg_$'] = (df['Curr'] - df['Prev']).fillna(0)
+    df['Chg_%'] = ((df['Curr'] / df['Prev'] - 1) * 100).fillna(0)
     return df
 
 df = load_all_data()
@@ -113,7 +115,7 @@ monthly_runway = (final_val * SWR) / 12
 
 # --- 5. UI DASHBOARD ---
 st.title("🛡️ THE VASIREDDY FORTRESS")
-st.caption(f"Status: Age {CUR_AGE} • Vision: Retire at {RET_AGE} (2035) • Obsidian v2.4")
+st.caption(f"Status: Age {CUR_AGE} • Vision: Retire at {RET_AGE} (2035) • Obsidian v2.4 Mastery")
 
 m1, m2, m3 = st.columns(3)
 m1.metric("TOTAL NET WORTH", f"${nw_curr:,.0f}", delta=f"${df['Chg_$'].sum():,.2f}")
@@ -148,13 +150,13 @@ with g_col:
 with t_col:
     st.write("### Strategy Insight")
     if risk_score > 75:
-        st.error("**Heat Level: Critical.** Your liquid wealth is highly coupled to Tech/AI volatility. High reward, but vulnerable to sector corrections.")
+        st.error("**Heat Level: Critical.** High Tech/AI coupling detected.")
     elif risk_score > 40:
-        st.warning("**Heat Level: Optimal.** Balanced growth with a solid safety net in India Assets and Cash.")
+        st.warning("**Heat Level: Optimal.** Balanced growth vs stability.")
     else:
-        st.success("**Heat Level: Defensive.** High stability, well-protected against market swings.")
+        st.success("**Heat Level: Defensive.** Portfolio well-insulated.")
     
-    st.info(f"**Safe Monthly Runway (2035):** Based on your {GROWTH_RATE*100:.0f}% projection, you're on track for **${monthly_runway:,.0f}/month**.")
+    st.info(f"**Projected 2035 Monthly Income:** **${monthly_runway:,.0f}/month** (Nominal).")
 
 st.divider()
 
@@ -162,32 +164,53 @@ st.divider()
 c1, c2 = st.columns([1.5, 1])
 
 with c1:
-    st.subheader(f"Projected Growth Path to 2035")
+    st.subheader(f"Projected Wealth to 2035")
     fig_path = go.Figure()
     fig_path.add_trace(go.Scatter(y=projection, fill='tozeroy', line=dict(color='#00E676', width=4)))
     fig_path.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color="white"), height=350)
     st.plotly_chart(fig_path, use_container_width=True)
 
 with c2:
-    st.subheader("Pillar Distribution")
+    st.subheader("Asset Pillars")
     fig_pie = px.pie(df[df['Curr']>0], values='Curr', names='Pillar', hole=0.6, color_discrete_sequence=px.colors.sequential.Tealgrn)
     fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"), showlegend=False)
     st.plotly_chart(fig_pie, use_container_width=True)
 
 st.divider()
 
-# --- MASTER LEDGER ---
+# --- RESTORED: ROBINHOOD TOP 10 ---
+rh_df = df[df['Pillar'] == 'Robinhood'].copy()
+rh_total = rh_df['Curr'].sum()
+rh_df['Port_%'] = (rh_df['Curr'] / rh_total) * 100
+top_10 = rh_df.sort_values('Curr', ascending=False).head(10)
+
+st.subheader("ROBINHOOD TOP 10 CONCENTRATION")
+t10_col_chart, t10_col_table = st.columns([1.5, 1])
+
+with t10_col_chart:
+    fig_rh = px.bar(top_10, x='Name', y='Curr', text_auto='.2s', color='Curr', 
+                    color_continuous_scale='tealgrn', hover_data={'Port_%': ':.2f%'})
+    fig_rh.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color="#B0B0B0"), coloraxis_showscale=False)
+    st.plotly_chart(fig_rh, use_container_width=True)
+
+with t10_col_table:
+    st.write("**Top 10 Asset Detail**")
+    st.dataframe(top_10[['Name', 'Curr', 'Port_%']].style.format({'Curr': '${:,.0f}', 'Port_%': '{:.2f}%'}), use_container_width=True, hide_index=True)
+
+st.divider()
+
+# --- RESTORED: MASTER LEDGER ---
 st.subheader("MASTER ASSET LEDGER")
 def style_ledger(val):
     if isinstance(val, (int, float)):
         if val > 0: return 'color: #00E676'
-        if val < 0: return 'color: #FF5252'
+        elif val < 0: return 'color: #FF5252'
     return 'color: #E0E0E0'
 
 st.dataframe(
-    df[['Pillar', 'Name', 'Curr', 'Risk']]
+    df[['Pillar', 'Name', 'Curr', 'Chg_$', 'Chg_%']]
     .sort_values(['Pillar', 'Curr'], ascending=False)
-    .style.format({'Curr': '${:,.2f}'})
-    .map(style_ledger, subset=['Curr']),
+    .style.format({'Curr': '${:,.2f}', 'Chg_$': '${:,.2f}', 'Chg_%': '{:,.2f}%'})
+    .map(style_ledger, subset=['Chg_$', 'Chg_%']),
     use_container_width=True, hide_index=True
 )
