@@ -8,7 +8,7 @@ from dateutil.relativedelta import relativedelta
 # --- APP CONFIG ---
 st.set_page_config(page_title="FIRE Pulse", layout="wide")
 
-# --- STYLING (High Contrast UI) ---
+# --- STYLING ---
 st.markdown("""
     <style>
     [data-testid="stMetric"] { background-color: #ffffff; padding: 20px; border-radius: 12px; border: 1px solid #d1d5db; box-shadow: 2px 2px 10px rgba(0,0,0,0.1); }
@@ -28,12 +28,10 @@ def calculate_home_equity():
     delta = relativedelta(now, start_date)
     months_passed = delta.years * 12 + delta.months
     
-    # Mortgage Balance (2.99%, 15yr)
     r, n = 0.0299 / 12, 15 * 12
     m_pay = mortgage_start * (r * (1 + r)**n) / ((1 + r)**n - 1)
     balance = mortgage_start * (1 + r)**months_passed - (m_pay / r) * ((1 + r)**months_passed - 1)
     
-    # Appreciation (2.5% Annual)
     growth_rate = (1 + 0.025)**(1/12) - 1
     current_value = purchase_price * (1 + growth_rate)**months_passed
     return current_value, balance
@@ -42,9 +40,8 @@ def calculate_home_equity():
 def load_all_pillars():
     home_val, m_bal = calculate_home_equity()
     
-    # Define the Pillars
     data = [
-        # PILLAR 1: Robinhood (Live Tickers)
+        # PILLAR 1: Robinhood
         {'Name': 'AAPL', 'Tkr': 'AAPL', 'Qty': 32.875151, 'Pillar': 'Robinhood'},
         {'Name': 'AMD', 'Tkr': 'AMD', 'Qty': 17.228305, 'Pillar': 'Robinhood'},
         {'Name': 'AMZN', 'Tkr': 'AMZN', 'Qty': 6.139473, 'Pillar': 'Robinhood'},
@@ -88,22 +85,16 @@ def load_all_pillars():
         {'Name': 'WDC', 'Tkr': 'WDC', 'Qty': 8.910648, 'Pillar': 'Robinhood'},
         {'Name': 'Bitcoin', 'Tkr': 'BTC-USD', 'Qty': 0.06752957, 'Pillar': 'Robinhood'},
         
-        # PILLAR 2: ETRADE (New Holdings)
-        {'Name': 'Total Stock Market', 'Tkr': 'VTSAX', 'Qty': 1080, 'Pillar': 'ETRADE'},
+        # PILLAR 2: ETRADE (Mutual Funds)
+        {'Name': 'Vanguard Total Stock', 'Tkr': 'VTSAX', 'Qty': 1080, 'Pillar': 'ETRADE'},
         {'Name': 'US Growth Fund', 'Tkr': 'VWUSX', 'Qty': 82.772, 'Pillar': 'ETRADE'},
         {'Name': 'S&P 500 Index', 'Tkr': 'VFIAX', 'Qty': 15.115, 'Pillar': 'ETRADE'},
         {'Name': 'International Stock', 'Tkr': 'VTIAX', 'Qty': 225.887, 'Pillar': 'ETRADE'},
         
-        # PILLAR 3: Retirement (Placeholder for next update)
+        # OTHER PILLARS
         {'Name': 'Retirement Balances', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Retirement', 'Base_Val': 0},
-        
-        # PILLAR 4: College Fund (Placeholder for next update)
         {'Name': '529 Plans', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'College Fund', 'Base_Val': 0},
-        
-        # PILLAR 5: Non-US/India
-        {'Name': 'International Repatriation', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Non-US/India', 'Base_Val': 300000},
-        
-        # SYSTEM: Real Estate & Debt
+        {'Name': 'India Assets', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Non-US/India', 'Base_Val': 300000},
         {'Name': 'Roswell Home', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Real Estate', 'Base_Val': home_val},
         {'Name': 'Mortgage Debt', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Liability', 'Base_Val': -m_bal}
     ]
@@ -112,16 +103,23 @@ def load_all_pillars():
     tkrs = df[df['Tkr'] != 'FIXED']['Tkr'].unique().tolist()
     
     try:
-        prices = yf.download(tkrs, period="2d", group_by='ticker', progress=False)
+        # Pull 7 days to guarantee we hit the last valid closing business day
+        prices_df = yf.download(tkrs, period="7d", group_by='ticker', progress=False)
+        
         def get_v(r):
             if r['Tkr'] == 'FIXED': return r['Base_Val'], r['Base_Val']
             try:
-                valid = prices[r['Tkr']]['Close'].dropna()
-                return valid.iloc[-1] * r['Qty'], valid.iloc[-2] * r['Qty']
-            except: return 0, 0
+                # Get non-empty closing prices
+                valid_data = prices_df[r['Tkr']]['Close'].dropna()
+                current_p = valid_data.iloc[-1]
+                prev_p = valid_data.iloc[-2]
+                return current_p * r['Qty'], prev_p * r['Qty']
+            except:
+                return 0, 0
+        
         df[['Curr_Val', 'Prev_Val']] = df.apply(lambda x: pd.Series(get_v(x)), axis=1)
     except:
-        df['Curr_Val'] = df['Base_Val'] if 'Base_Val' in df else 0
+        df['Curr_Val'] = df.get('Base_Val', 0)
         df['Prev_Val'] = df['Curr_Val']
 
     df['Day_Chg'] = (df['Curr_Val'] - df['Prev_Val']).fillna(0)
@@ -129,17 +127,17 @@ def load_all_pillars():
 
 df = load_all_pillars()
 
-# --- DASHBOARD LAYOUT ---
-st.title("🔥 FIRE Pulse: The Five Pillars")
-
-# Metrics
+# --- CALCULATIONS ---
 nw = df['Curr_Val'].sum()
 day_p = df['Day_Chg'].sum()
 fire_f = df[df['Pillar'].isin(['Robinhood', 'ETRADE', 'Retirement'])]['Curr_Val'].sum()
 h_equity = df[df['Pillar'] == 'Real Estate']['Curr_Val'].sum() + df[df['Pillar'] == 'Liability']['Curr_Val'].sum()
 
+# --- DASHBOARD ---
+st.title("🔥 FIRE Pulse: Pillar Dashboard")
+
 m1, m2, m3, m4 = st.columns(4)
-m1.metric("Net Worth", f"${nw:,.0f}", delta=f"${day_p:,.2f} Today")
+m1.metric("Net Worth", f"${nw:,.0f}", delta=f"${day_p:,.2f}")
 m2.metric("FIRE Pillars", f"${fire_f:,.0f}")
 m3.metric("Home Equity", f"${h_equity:,.0f}")
 m4.metric("Non-US Assets", f"${df[df['Pillar']=='Non-US/India']['Curr_Val'].sum():,.0f}")
@@ -148,22 +146,23 @@ st.divider()
 
 c1, c2 = st.columns([1.5, 1])
 with c1:
-    st.subheader("Asset Allocation by Pillar")
+    st.subheader("Asset Allocation")
     pie_df = df[df['Curr_Val'] > 0].groupby('Pillar')['Curr_Val'].sum().reset_index()
     fig = px.pie(pie_df, values='Curr_Val', names='Pillar', hole=0.5, color_discrete_sequence=px.colors.sequential.Teal)
     fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"))
     st.plotly_chart(fig, use_container_width=True)
 
 with c2:
-    st.subheader("Pillar Pulse")
+    st.subheader("Pillar Summary")
     p_summary = df.groupby('Pillar')['Curr_Val'].sum()
-    for p in ['Robinhood', 'ETRADE', 'Non-US/India', 'Real Estate']:
+    for p in ['Robinhood', 'ETRADE', 'Retirement', 'Non-US/India']:
+        val = p_summary.get(p, 0)
         st.write(f"**{p}**")
-        st.caption(f"${p_summary.get(p, 0):,.0f}")
-        st.progress(min(p_summary.get(p, 0) / 1000000, 1.0))
+        st.caption(f"${val:,.0f}")
+        st.progress(min(val / 1000000, 1.0))
 
 st.divider()
-st.subheader("Master Ledger")
+st.subheader("Master Asset Ledger")
 st.dataframe(df[['Pillar', 'Name', 'Curr_Val', 'Day_Chg']].sort_values(['Pillar', 'Curr_Val'], ascending=False).style.format({
     'Curr_Val': '${:,.2f}', 'Day_Chg': '${:,.2f}'
 }), use_container_width=True, hide_index=True)
