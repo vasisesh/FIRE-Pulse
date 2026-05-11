@@ -6,7 +6,7 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
 # --- APP CONFIG ---
-st.set_page_config(page_title="FIRE Pulse V2", layout="wide")
+st.set_page_config(page_title="FIRE Pulse V3", layout="wide")
 
 # --- OBSIDIAN & EMERALD UI ---
 st.markdown("""
