@@ -15,30 +15,38 @@ st.markdown("""
     [data-testid="stMetricLabel"] { color: #4b5563 !important; font-weight: 600 !important; }
     [data-testid="stMetricValue"] { color: #111827 !important; font-weight: 800 !important; }
     .main { background-color: #0e1117; }
+    /* FIRE Progress Bar Color */
     .stProgress > div > div > div > div { background-image: linear-gradient(to right, #008080 , #00ffcc); }
     </style>
     """, unsafe_allow_html=True)
 
 # --- CONSTANTS ---
 FIRE_TARGET = 1000000
+COLLEGE_TARGET = 125000
+COLLEGE_TARGET_YEAR = 2030
 
 # --- ENGINES ---
-def calculate_home_equity():
+def calculate_real_estate():
     start_date = datetime(2022, 4, 1)
     purchase_price = 600000
     mortgage_start = 480000
     now = datetime.now()
     delta = relativedelta(now, start_date)
     months_passed = delta.years * 12 + delta.months
+    
+    # Mortgage Balance (2.99%, 15yr)
     r, n = 0.0299 / 12, 15 * 12
     m_pay = mortgage_start * (r * (1 + r)**n) / ((1 + r)**n - 1)
     balance = mortgage_start * (1 + r)**months_passed - (m_pay / r) * ((1 + r)**months_passed - 1)
+    
+    # Appreciation (2.5% Annual)
     growth_rate = (1 + 0.025)**(1/12) - 1
-    current_value = purchase_price * (1 + growth_rate)**months_passed
-    return current_value, balance
+    current_house_val = purchase_price * (1 + growth_rate)**months_passed
+    
+    return current_house_val, balance
 
 def load_all_pillars():
-    home_val, m_bal = calculate_home_equity()
+    h_val, m_bal = calculate_real_estate()
     data = [
         # PILLAR 1: Robinhood
         {'Name': 'AAPL', 'Tkr': 'AAPL', 'Qty': 32.875151, 'Pillar': 'Robinhood'},
@@ -83,16 +91,25 @@ def load_all_pillars():
         {'Name': 'STX', 'Tkr': 'STX', 'Qty': 4.744995, 'Pillar': 'Robinhood'},
         {'Name': 'WDC', 'Tkr': 'WDC', 'Qty': 8.910648, 'Pillar': 'Robinhood'},
         {'Name': 'Bitcoin', 'Tkr': 'BTC-USD', 'Qty': 0.06752957, 'Pillar': 'Robinhood'},
+        
         # PILLAR 2: ETRADE
         {'Name': 'Total Stock Market', 'Tkr': 'VTSAX', 'Qty': 1080, 'Pillar': 'ETRADE'},
         {'Name': 'US Growth Fund', 'Tkr': 'VWUSX', 'Qty': 82.772, 'Pillar': 'ETRADE'},
         {'Name': 'S&P 500 Index', 'Tkr': 'VFIAX', 'Qty': 15.115, 'Pillar': 'ETRADE'},
         {'Name': 'International Stock', 'Tkr': 'VTIAX', 'Qty': 225.887, 'Pillar': 'ETRADE'},
-        # PILLARS 3-5
+        
+        # PILLAR 3: Retirement (Placeholder)
         {'Name': 'Retirement Balances', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Retirement', 'Base_Val': 0},
-        {'Name': '529 Plans', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'College Fund', 'Base_Val': 0},
+        
+        # PILLAR 4: College Fund (Live Holdings)
+        {'Name': 'VTSAX (College)', 'Tkr': 'VTSAX', 'Qty': 209.296, 'Pillar': 'College Fund'},
+        {'Name': 'VTI (College)', 'Tkr': 'VTI', 'Qty': 222.203, 'Pillar': 'College Fund'},
+        
+        # PILLAR 5: Non-US/India
         {'Name': 'India Assets', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Non-US/India', 'Base_Val': 300000},
-        {'Name': 'Roswell Home', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Real Estate', 'Base_Val': home_val},
+        
+        # SYSTEM
+        {'Name': 'Roswell Home', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Real Estate', 'Base_Val': h_val},
         {'Name': 'Mortgage Debt', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Liability', 'Base_Val': -m_bal}
     ]
     df = pd.DataFrame(data)
@@ -115,50 +132,50 @@ df = load_all_pillars()
 # --- CALCULATIONS ---
 nw = df['Curr_Val'].sum()
 day_p = df['Day_Chg'].sum()
-# REFINED PILLAR TOTAL: Robinhood + ETRADE + India Assets
+
 fire_current = df[df['Pillar'].isin(['Robinhood', 'ETRADE', 'Non-US/India'])]['Curr_Val'].sum()
 fire_pct = min(fire_current / FIRE_TARGET, 1.0)
-gap = max(0, FIRE_TARGET - fire_current)
+
+college_current = df[df['Pillar'] == 'College Fund']['Curr_Val'].sum()
+college_pct = min(college_current / COLLEGE_TARGET, 1.0)
 
 # --- DASHBOARD ---
-st.title("🔥 FIRE Pulse: Roadmap to $1M")
+st.title("🔥 FIRE Pulse: Roadmap to Milestones")
 
-# Row 1: High Level Metrics
 col1, col2, col3 = st.columns(3)
 col1.metric("Total Net Worth", f"${nw:,.0f}", delta=f"${day_p:,.2f} Today")
-col2.metric("FIRE Pillar Status", f"${fire_current:,.0f}")
-col3.metric("Gap to $1M Goal", f"${gap:,.0f}")
+col2.metric("FIRE Asset Value", f"${fire_current:,.0f}")
+col3.metric("College Asset Value", f"${college_current:,.0f}")
 
 st.divider()
 
-# Row 2: Visual Progress Bar
-st.subheader(f"Progress towards $1,000,000 Milestone: {fire_pct:.1%}")
-st.progress(fire_pct)
-st.caption(f"Includes Robinhood + E*TRADE + India Assets")
+# PROGRESS TRACKERS
+left_prog, right_prog = st.columns(2)
+with left_prog:
+    st.subheader(f"FIRE Goal Progress ($1M): {fire_pct:.1%}")
+    st.progress(fire_pct)
+with right_prog:
+    st.subheader(f"College Goal Progress ($125k): {college_pct:.1%}")
+    st.progress(college_pct)
 
 st.divider()
 
-# Row 3: Charts
-c1, c2 = st.columns([1.5, 1])
-with c1:
-    st.subheader("Asset Distribution")
+c_left, c_right = st.columns([1.5, 1])
+with c_left:
+    st.subheader("Pillar Distribution")
     pie_df = df[df['Curr_Val'] > 0].groupby('Pillar')['Curr_Val'].sum().reset_index()
     fig = px.pie(pie_df, values='Curr_Val', names='Pillar', hole=0.5, color_discrete_sequence=px.colors.sequential.Teal)
     fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"))
     st.plotly_chart(fig, use_container_width=True)
 
-with c2:
-    st.subheader("Component Values")
-    rh_val = df[df['Pillar'] == 'Robinhood']['Curr_Val'].sum()
-    et_val = df[df['Pillar'] == 'ETRADE']['Curr_Val'].sum()
-    in_val = df[df['Pillar'] == 'Non-US/India']['Curr_Val'].sum()
-    
-    st.write(f"**Robinhood Portfolio:** ${rh_val:,.0f}")
-    st.write(f"**E*TRADE Portfolio:** ${et_val:,.0f}")
-    st.write(f"**India Assets:** ${in_val:,.0f}")
+with c_right:
+    st.subheader("Component Summary")
+    for p in ['Robinhood', 'ETRADE', 'College Fund', 'Non-US/India']:
+        val = df[df['Pillar'] == p]['Curr_Val'].sum()
+        st.write(f"**{p}**: ${val:,.0f}")
 
 st.divider()
-st.subheader("Detailed Asset Ledger")
+st.subheader("Master Asset Ledger")
 st.dataframe(df[['Pillar', 'Name', 'Curr_Val', 'Day_Chg']].sort_values(['Pillar', 'Curr_Val'], ascending=False).style.format({
     'Curr_Val': '${:,.2f}', 'Day_Chg': '${:,.2f}'
 }), use_container_width=True, hide_index=True)
