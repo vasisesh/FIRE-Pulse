@@ -14,12 +14,15 @@ st.markdown("""
     [data-testid="stMetric"] { background-color: #ffffff; padding: 20px; border-radius: 12px; border: 1px solid #d1d5db; box-shadow: 2px 2px 10px rgba(0,0,0,0.1); }
     [data-testid="stMetricLabel"] { color: #4b5563 !important; font-weight: 600 !important; }
     [data-testid="stMetricValue"] { color: #111827 !important; font-weight: 800 !important; }
-    [data-testid="stMetricDelta"] svg { display: none; }
     .main { background-color: #0e1117; }
+    .stProgress > div > div > div > div { background-image: linear-gradient(to right, #008080 , #00ffcc); }
     </style>
     """, unsafe_allow_html=True)
 
-# --- ENGINE: Mortgage & Real Estate ---
+# --- CONSTANTS ---
+FIRE_TARGET = 1000000
+
+# --- ENGINES ---
 def calculate_home_equity():
     start_date = datetime(2022, 4, 1)
     purchase_price = 600000
@@ -27,19 +30,15 @@ def calculate_home_equity():
     now = datetime.now()
     delta = relativedelta(now, start_date)
     months_passed = delta.years * 12 + delta.months
-    
     r, n = 0.0299 / 12, 15 * 12
     m_pay = mortgage_start * (r * (1 + r)**n) / ((1 + r)**n - 1)
     balance = mortgage_start * (1 + r)**months_passed - (m_pay / r) * ((1 + r)**months_passed - 1)
-    
     growth_rate = (1 + 0.025)**(1/12) - 1
     current_value = purchase_price * (1 + growth_rate)**months_passed
     return current_value, balance
 
-# --- ENGINE: Data Aggregator ---
 def load_all_pillars():
     home_val, m_bal = calculate_home_equity()
-    
     data = [
         # PILLAR 1: Robinhood
         {'Name': 'AAPL', 'Tkr': 'AAPL', 'Qty': 32.875151, 'Pillar': 'Robinhood'},
@@ -84,44 +83,30 @@ def load_all_pillars():
         {'Name': 'STX', 'Tkr': 'STX', 'Qty': 4.744995, 'Pillar': 'Robinhood'},
         {'Name': 'WDC', 'Tkr': 'WDC', 'Qty': 8.910648, 'Pillar': 'Robinhood'},
         {'Name': 'Bitcoin', 'Tkr': 'BTC-USD', 'Qty': 0.06752957, 'Pillar': 'Robinhood'},
-        
-        # PILLAR 2: ETRADE (Mutual Funds)
-        {'Name': 'Vanguard Total Stock', 'Tkr': 'VTSAX', 'Qty': 1080, 'Pillar': 'ETRADE'},
+        # PILLAR 2: ETRADE
+        {'Name': 'Total Stock Market', 'Tkr': 'VTSAX', 'Qty': 1080, 'Pillar': 'ETRADE'},
         {'Name': 'US Growth Fund', 'Tkr': 'VWUSX', 'Qty': 82.772, 'Pillar': 'ETRADE'},
         {'Name': 'S&P 500 Index', 'Tkr': 'VFIAX', 'Qty': 15.115, 'Pillar': 'ETRADE'},
         {'Name': 'International Stock', 'Tkr': 'VTIAX', 'Qty': 225.887, 'Pillar': 'ETRADE'},
-        
-        # OTHER PILLARS
+        # PILLARS 3-5
         {'Name': 'Retirement Balances', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Retirement', 'Base_Val': 0},
         {'Name': '529 Plans', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'College Fund', 'Base_Val': 0},
         {'Name': 'India Assets', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Non-US/India', 'Base_Val': 300000},
         {'Name': 'Roswell Home', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Real Estate', 'Base_Val': home_val},
         {'Name': 'Mortgage Debt', 'Tkr': 'FIXED', 'Qty': 1, 'Pillar': 'Liability', 'Base_Val': -m_bal}
     ]
-    
     df = pd.DataFrame(data)
     tkrs = df[df['Tkr'] != 'FIXED']['Tkr'].unique().tolist()
-    
     try:
-        # Pull 7 days to guarantee we hit the last valid closing business day
-        prices_df = yf.download(tkrs, period="7d", group_by='ticker', progress=False)
-        
+        p_df = yf.download(tkrs, period="7d", group_by='ticker', progress=False)
         def get_v(r):
             if r['Tkr'] == 'FIXED': return r['Base_Val'], r['Base_Val']
-            try:
-                # Get non-empty closing prices
-                valid_data = prices_df[r['Tkr']]['Close'].dropna()
-                current_p = valid_data.iloc[-1]
-                prev_p = valid_data.iloc[-2]
-                return current_p * r['Qty'], prev_p * r['Qty']
-            except:
-                return 0, 0
-        
+            valid = p_df[r['Tkr']]['Close'].dropna()
+            return valid.iloc[-1] * r['Qty'], valid.iloc[-2] * r['Qty']
         df[['Curr_Val', 'Prev_Val']] = df.apply(lambda x: pd.Series(get_v(x)), axis=1)
     except:
         df['Curr_Val'] = df.get('Base_Val', 0)
         df['Prev_Val'] = df['Curr_Val']
-
     df['Day_Chg'] = (df['Curr_Val'] - df['Prev_Val']).fillna(0)
     return df
 
@@ -130,39 +115,50 @@ df = load_all_pillars()
 # --- CALCULATIONS ---
 nw = df['Curr_Val'].sum()
 day_p = df['Day_Chg'].sum()
-fire_f = df[df['Pillar'].isin(['Robinhood', 'ETRADE', 'Retirement'])]['Curr_Val'].sum()
-h_equity = df[df['Pillar'] == 'Real Estate']['Curr_Val'].sum() + df[df['Pillar'] == 'Liability']['Curr_Val'].sum()
+# REFINED PILLAR TOTAL: Robinhood + ETRADE + India Assets
+fire_current = df[df['Pillar'].isin(['Robinhood', 'ETRADE', 'Non-US/India'])]['Curr_Val'].sum()
+fire_pct = min(fire_current / FIRE_TARGET, 1.0)
+gap = max(0, FIRE_TARGET - fire_current)
 
 # --- DASHBOARD ---
-st.title("🔥 FIRE Pulse: Pillar Dashboard")
+st.title("🔥 FIRE Pulse: Roadmap to $1M")
 
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("Net Worth", f"${nw:,.0f}", delta=f"${day_p:,.2f}")
-m2.metric("FIRE Pillars", f"${fire_f:,.0f}")
-m3.metric("Home Equity", f"${h_equity:,.0f}")
-m4.metric("Non-US Assets", f"${df[df['Pillar']=='Non-US/India']['Curr_Val'].sum():,.0f}")
+# Row 1: High Level Metrics
+col1, col2, col3 = st.columns(3)
+col1.metric("Total Net Worth", f"${nw:,.0f}", delta=f"${day_p:,.2f} Today")
+col2.metric("FIRE Pillar Status", f"${fire_current:,.0f}")
+col3.metric("Gap to $1M Goal", f"${gap:,.0f}")
 
 st.divider()
 
+# Row 2: Visual Progress Bar
+st.subheader(f"Progress towards $1,000,000 Milestone: {fire_pct:.1%}")
+st.progress(fire_pct)
+st.caption(f"Includes Robinhood + E*TRADE + India Assets")
+
+st.divider()
+
+# Row 3: Charts
 c1, c2 = st.columns([1.5, 1])
 with c1:
-    st.subheader("Asset Allocation")
+    st.subheader("Asset Distribution")
     pie_df = df[df['Curr_Val'] > 0].groupby('Pillar')['Curr_Val'].sum().reset_index()
     fig = px.pie(pie_df, values='Curr_Val', names='Pillar', hole=0.5, color_discrete_sequence=px.colors.sequential.Teal)
     fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"))
     st.plotly_chart(fig, use_container_width=True)
 
 with c2:
-    st.subheader("Pillar Summary")
-    p_summary = df.groupby('Pillar')['Curr_Val'].sum()
-    for p in ['Robinhood', 'ETRADE', 'Retirement', 'Non-US/India']:
-        val = p_summary.get(p, 0)
-        st.write(f"**{p}**")
-        st.caption(f"${val:,.0f}")
-        st.progress(min(val / 1000000, 1.0))
+    st.subheader("Component Values")
+    rh_val = df[df['Pillar'] == 'Robinhood']['Curr_Val'].sum()
+    et_val = df[df['Pillar'] == 'ETRADE']['Curr_Val'].sum()
+    in_val = df[df['Pillar'] == 'Non-US/India']['Curr_Val'].sum()
+    
+    st.write(f"**Robinhood Portfolio:** ${rh_val:,.0f}")
+    st.write(f"**E*TRADE Portfolio:** ${et_val:,.0f}")
+    st.write(f"**India Assets:** ${in_val:,.0f}")
 
 st.divider()
-st.subheader("Master Asset Ledger")
+st.subheader("Detailed Asset Ledger")
 st.dataframe(df[['Pillar', 'Name', 'Curr_Val', 'Day_Chg']].sort_values(['Pillar', 'Curr_Val'], ascending=False).style.format({
     'Curr_Val': '${:,.2f}', 'Day_Chg': '${:,.2f}'
 }), use_container_width=True, hide_index=True)
